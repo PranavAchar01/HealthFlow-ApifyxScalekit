@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Encounter } from "@/types";
-import { getEncounters, addNursingNote, setTriageStatus } from "@/lib/api";
+import { getEncounters, addNursingNote, setTriageStatus, subscribeToEncounters } from "@/lib/api";
 
 const TRIAGE_OPTS = ["pending","in_assessment","ready_for_doctor","escalated"] as const;
 const NOTE_CATS = ["assessment","vitals_update","medication","escalation","general"] as const;
@@ -26,15 +26,48 @@ export default function NurseStation() {
   const [saving, setSaving] = useState(false);
   const [triaging, setTriaging] = useState(false);
 
+  const selectedIdRef = useRef<string | null>(null);
+  useEffect(() => { selectedIdRef.current = selected?.id ?? null; }, [selected]);
+
   const refresh = useCallback(async () => {
     try {
       const list = await getEncounters();
       setEncounters(list);
-      if (selected) { const u = list.find(e=>e.id===selected.id); if(u) setSelected(u); }
+      if (selectedIdRef.current) {
+        const u = list.find(e=>e.id===selectedIdRef.current);
+        if (u) setSelected(u);
+      }
     } catch {}
-  }, [selected]);
+  }, []);
 
-  useEffect(() => { refresh(); const t = setInterval(refresh, 3000); return ()=>clearInterval(t); }, [refresh]);
+  useEffect(() => {
+    // SSE handles real-time. A 30s poll is a safety net in case the stream
+    // dies and the browser fails to reconnect (e.g., behind certain proxies).
+    refresh();
+    const dispose = subscribeToEncounters({
+      onSnapshot: (list) => {
+        setEncounters(list);
+        if (selectedIdRef.current) {
+          const u = list.find(e=>e.id===selectedIdRef.current);
+          if (u) setSelected(u);
+        }
+      },
+      onUpsert: (enc) => {
+        setEncounters(prev => {
+          const idx = prev.findIndex(e=>e.id===enc.id);
+          if (idx === -1) return [enc, ...prev];
+          const next = [...prev]; next[idx] = enc; return next;
+        });
+        if (selectedIdRef.current === enc.id) setSelected(enc);
+      },
+      onDelete: (id) => {
+        setEncounters(prev => prev.filter(e=>e.id!==id));
+        if (selectedIdRef.current === id) setSelected(null);
+      },
+    });
+    const poll = setInterval(refresh, 30000);
+    return () => { dispose(); clearInterval(poll); };
+  }, [refresh]);
 
   const handleNote = async () => {
     if (!note.trim() || !selected) return;

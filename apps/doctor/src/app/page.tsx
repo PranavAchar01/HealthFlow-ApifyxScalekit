@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Encounter } from "@/types";
-import { getEncounters, commitEncounter } from "@/lib/api";
+import { getEncounters, commitEncounter, subscribeToEncounters } from "@/lib/api";
 
 function Panel({ title, children, className="" }: { title:string; children:React.ReactNode; className?:string }) {
   return (
@@ -21,15 +21,46 @@ export default function DoctorCRM() {
   const [approving, setApproving] = useState(false);
   const [error, setError] = useState<string|null>(null);
 
+  const selectedIdRef = useRef<string | null>(null);
+  useEffect(() => { selectedIdRef.current = selected?.id ?? null; }, [selected]);
+
   const refresh = useCallback(async () => {
     try {
       const list = await getEncounters();
       setEncounters(list);
-      if (selected) { const u = list.find(e=>e.id===selected.id); if(u) setSelected(u); }
+      if (selectedIdRef.current) {
+        const u = list.find(e=>e.id===selectedIdRef.current);
+        if (u) setSelected(u);
+      }
     } catch {}
-  }, [selected]);
+  }, []);
 
-  useEffect(() => { refresh(); const t = setInterval(refresh, 2500); return ()=>clearInterval(t); }, [refresh]);
+  useEffect(() => {
+    refresh();
+    const dispose = subscribeToEncounters({
+      onSnapshot: (list) => {
+        setEncounters(list);
+        if (selectedIdRef.current) {
+          const u = list.find(e=>e.id===selectedIdRef.current);
+          if (u) setSelected(u);
+        }
+      },
+      onUpsert: (enc) => {
+        setEncounters(prev => {
+          const idx = prev.findIndex(e=>e.id===enc.id);
+          if (idx === -1) return [enc, ...prev];
+          const next = [...prev]; next[idx] = enc; return next;
+        });
+        if (selectedIdRef.current === enc.id) setSelected(enc);
+      },
+      onDelete: (id) => {
+        setEncounters(prev => prev.filter(e=>e.id!==id));
+        if (selectedIdRef.current === id) setSelected(null);
+      },
+    });
+    const poll = setInterval(refresh, 30000);
+    return () => { dispose(); clearInterval(poll); };
+  }, [refresh]);
 
   const handleApprove = async () => {
     if (!selected) return;

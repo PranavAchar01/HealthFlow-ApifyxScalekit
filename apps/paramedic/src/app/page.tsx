@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -9,6 +9,21 @@ type Result = {
   reasoning?: string; safetyFlags: { drug: string; conflictsWith: string; severity: string; description: string; alternative?: string }[];
   orders: { description: string; type: string; urgency: string; status: string }[];
   auditEntries: number;
+};
+
+type LiveEncounter = {
+  id: string;
+  status: string;
+  acuity: string;
+  createdAt: string;
+  updatedAt: string;
+  paramedicName: string;
+  structuredData?: { chiefComplaint?: string; vitals?: Record<string, unknown> };
+  patientContext?: { name?: string; age?: number; sex?: string };
+  diagnosis?: { primary?: string; confidence?: number; reasoning?: string };
+  draftOrders?: { description: string; type: string; urgency: string; status: string }[];
+  safetyFlags?: { drug: string; conflictsWith: string; severity: string; description: string; alternative?: string }[];
+  auditTrail?: unknown[];
 };
 
 function TopNav({ subtitle }: { subtitle: string }) {
@@ -59,8 +74,70 @@ export default function ParamedicApp() {
   const [transcript, setTranscript] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [liveEncounters, setLiveEncounters] = useState<LiveEncounter[]>([]);
   const mrRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+
+  // Live stream — encounters created by 911 dispatch (or any other paramedic)
+  // appear instantly here as the agent pipeline progresses.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const es = new EventSource(`${API_URL}/api/encounters/stream`);
+    const upsert = (e: LiveEncounter) => setLiveEncounters(prev => {
+      const i = prev.findIndex(x => x.id === e.id);
+      if (i === -1) return [e, ...prev].slice(0, 10);
+      const next = [...prev]; next[i] = e; return next;
+    });
+    es.addEventListener("snapshot", (ev) => {
+      try {
+        const { encounters } = JSON.parse((ev as MessageEvent).data) as { encounters: LiveEncounter[] };
+        setLiveEncounters(encounters.slice(0, 10));
+      } catch {}
+    });
+    es.addEventListener("upsert", (ev) => {
+      try { upsert(JSON.parse((ev as MessageEvent).data) as LiveEncounter); } catch {}
+    });
+    es.addEventListener("delete", (ev) => {
+      try {
+        const { id } = JSON.parse((ev as MessageEvent).data) as { id: string };
+        setLiveEncounters(prev => prev.filter(e => e.id !== id));
+      } catch {}
+    });
+    return () => es.close();
+  }, []);
+
+  const loadIncoming = (e: LiveEncounter) => {
+    setResult({
+      encounterId: e.id,
+      status: e.status,
+      acuity: e.acuity,
+      chiefComplaint: e.structuredData?.chiefComplaint,
+      diagnosis: e.diagnosis?.primary,
+      confidence: e.diagnosis?.confidence,
+      reasoning: e.diagnosis?.reasoning,
+      safetyFlags: e.safetyFlags ?? [],
+      orders: e.draftOrders ?? [],
+      auditEntries: e.auditTrail?.length ?? 0,
+    });
+  };
+
+  // When an encounter we're viewing gets updated by the stream, keep the result in sync
+  useEffect(() => {
+    if (!result) return;
+    const live = liveEncounters.find(e => e.id === result.encounterId);
+    if (!live) return;
+    setResult(r => r && r.encounterId === live.id ? {
+      ...r,
+      status: live.status, acuity: live.acuity,
+      chiefComplaint: live.structuredData?.chiefComplaint ?? r.chiefComplaint,
+      diagnosis: live.diagnosis?.primary ?? r.diagnosis,
+      confidence: live.diagnosis?.confidence ?? r.confidence,
+      reasoning: live.diagnosis?.reasoning ?? r.reasoning,
+      safetyFlags: live.safetyFlags ?? r.safetyFlags,
+      orders: live.draftOrders ?? r.orders,
+      auditEntries: live.auditTrail?.length ?? r.auditEntries,
+    } : r);
+  }, [liveEncounters, result?.encounterId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startRec = useCallback(async () => {
     try {
@@ -121,47 +198,107 @@ export default function ParamedicApp() {
       <TopNav subtitle="Sarah Mitchell · Unit 42" />
       <ActionBar actions={["🎙 START DICTATION","⏹ STOP RECORDING","📤 SUBMIT TO PIPELINE","🗑 CLEAR TRANSCRIPT","🖨 PRINT REPORT"]} />
 
-      {/* Patient card strip */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4 flex-shrink-0">
-        <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">?</div>
-        <div className="flex-1">
-          <p className="text-xs text-gray-400 uppercase tracking-wide">PATIENT</p>
-          <p className="text-lg font-bold text-gray-800">{result ? "John Martinez (PT-20240001)" : "Unknown — Pending Identification"}</p>
-        </div>
-        <div className="flex gap-6 text-xs">
-          <div><p className="text-gray-400">Unit</p><p className="font-semibold">Unit 42</p></div>
-          <div><p className="text-gray-400">Dispatcher</p><p className="font-semibold">Dispatch 9</p></div>
-          <div><p className="text-gray-400">Risk Level</p>
-            <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold text-white ${
-              result?.acuity === "critical" ? "bg-red-500" : result?.acuity === "high" ? "bg-orange-500" : "bg-gray-400"
-            }`}>{result ? result.acuity.toUpperCase() : "—"}</span>
+      {/* Patient card strip — driven by live dispatch */}
+      {(() => {
+        const live = result ? liveEncounters.find(e => e.id === result.encounterId) : undefined;
+        const name = live?.patientContext?.name ?? (result?.chiefComplaint ? "Incoming…" : null);
+        const initials = name && name !== "Incoming…" ? name.split(" ").map(s => s[0]).join("").slice(0,2) : "?";
+        const ageSex = live?.patientContext ? `${live.patientContext.age}yo ${live.patientContext.sex}` : null;
+        const inFlight = result && result.status !== "committed" && result.status !== "approved";
+        return (
+          <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4 flex-shrink-0">
+            <div className={`w-12 h-12 rounded-full text-white flex items-center justify-center font-bold text-sm flex-shrink-0 ${name && name !== "Incoming…" ? "bg-blue-600" : "bg-gray-400"}`}>{initials}</div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-gray-400 uppercase tracking-wide">PATIENT</p>
+                {inFlight && (
+                  <span className="flex items-center gap-1 text-xs text-blue-600 font-medium">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"/>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"/>
+                    </span>
+                    LIVE
+                  </span>
+                )}
+              </div>
+              <p className="text-lg font-bold text-gray-800">
+                {name ?? "Unknown — Pending Identification"}
+                {ageSex && <span className="text-sm text-gray-500 font-normal ml-2">{ageSex}</span>}
+              </p>
+            </div>
+            <div className="flex gap-6 text-xs">
+              <div><p className="text-gray-400">Unit</p><p className="font-semibold">Unit 42</p></div>
+              <div><p className="text-gray-400">Dispatcher</p><p className="font-semibold">Dispatch 9</p></div>
+              <div><p className="text-gray-400">Risk Level</p>
+                <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold text-white ${
+                  result?.acuity === "critical" ? "bg-red-500" : result?.acuity === "high" ? "bg-orange-500" : result?.acuity === "medium" ? "bg-yellow-500" : "bg-gray-400"
+                }`}>{result ? result.acuity.toUpperCase() : "—"}</span>
+              </div>
+              <div><p className="text-gray-400">Status</p><p className="font-semibold capitalize">{result?.status.replace(/_/g," ") ?? "Ready"}</p></div>
+            </div>
           </div>
-          <div><p className="text-gray-400">Status</p><p className="font-semibold">{result?.status.replace(/_/g," ") ?? "Ready"}</p></div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Main 3-col layout */}
       <div className="flex flex-1 overflow-hidden p-3 gap-3">
 
-        {/* LEFT: Paramedic info */}
-        <div className="w-52 flex-shrink-0">
-          <Panel title="Paramedic" className="h-full">
-            <div className="px-3 py-2 space-y-3">
+        {/* LEFT: Paramedic + live dispatches */}
+        <div className="w-56 flex-shrink-0 flex flex-col gap-3">
+          <Panel title="Paramedic" className="flex-shrink-0">
+            <div className="px-3 py-2 space-y-2">
               <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
-                <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-sm">SM</div>
+                <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs">SM</div>
                 <div>
-                  <p className="font-semibold text-gray-900">Sarah Mitchell</p>
-                  <p className="text-xs text-gray-400">Paramedic · ID pm-001</p>
+                  <p className="font-semibold text-gray-900 text-xs">Sarah Mitchell</p>
+                  <p className="text-xs text-gray-400">Unit 42 · AEMT</p>
                 </div>
               </div>
-              {[["Unit","Unit 42"],["Shift","Day · 07:00–19:00"],["Station","Station 9"],["Cert Level","AEMT"],["Radio","CH-4"],["Status","Active"]].map(([l,v])=>(
-                <div key={l}><p className="text-gray-400 text-xs">{l}</p><p className="font-medium text-gray-800">{v}</p></div>
-              ))}
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                {[["Shift","Day"],["Station","9"],["Radio","CH-4"],["Status","Active"]].map(([l,v])=>(
+                  <div key={l}><p className="text-gray-400">{l}</p><p className="font-medium text-gray-800">{v}</p></div>
+                ))}
+              </div>
             </div>
-            <div className="border-t border-gray-100 px-3 py-2">
-              <p className="text-[#00a99d] font-bold text-xs uppercase tracking-widest mb-2">Auth Token</p>
-              <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600 block break-all">paramedic_sarah</code>
-              <p className="text-xs text-gray-400 mt-1">Scalekit · field_data_entry</p>
+          </Panel>
+
+          <Panel title={`Live Dispatches (${liveEncounters.length})`} className="flex-1">
+            <div className="divide-y divide-gray-50">
+              {liveEncounters.length === 0 && (
+                <p className="text-xs text-gray-400 italic text-center py-6 px-3">
+                  Awaiting dispatch…<br/>
+                  <span className="text-gray-300">Live feed from 911 + field units</span>
+                </p>
+              )}
+              {liveEncounters.map(e => {
+                const isActive = result?.encounterId === e.id;
+                const acuityClr = e.acuity === "critical" ? "bg-red-500"
+                  : e.acuity === "high" ? "bg-orange-500"
+                  : e.acuity === "medium" ? "bg-yellow-500" : "bg-green-500";
+                const stage = e.status.replace(/_/g," ");
+                const inFlight = !["committed","approved"].includes(e.status);
+                return (
+                  <button key={e.id} onClick={() => loadIncoming(e)}
+                    className={`w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors ${isActive?"bg-blue-50 border-l-2 border-l-[#2563a8]":""}`}>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${acuityClr} ${inFlight ? "animate-pulse" : ""}`}/>
+                      <p className="font-semibold text-gray-900 text-xs truncate flex-1">
+                        {e.patientContext?.name ?? "Incoming…"}
+                      </p>
+                      <span className="text-xs text-gray-400">
+                        {new Date(e.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 truncate mt-0.5 pl-4">
+                      {e.structuredData?.chiefComplaint ?? "processing…"}
+                    </p>
+                    <p className="text-xs pl-4 mt-0.5">
+                      <span className={`capitalize ${inFlight ? "text-blue-600 font-medium" : "text-gray-400"}`}>{stage}</span>
+                      {(e.safetyFlags?.length ?? 0) > 0 && <span className="text-red-600 font-bold ml-1">⚠{e.safetyFlags!.length}</span>}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
           </Panel>
         </div>

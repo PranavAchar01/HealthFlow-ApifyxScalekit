@@ -1,5 +1,6 @@
 import { Encounter, AgentResult, PatientContext } from "@/types";
 import { createAuditEntry } from "@/lib/audit";
+import { upsertEncounter } from "@/lib/store";
 import { v4 as uuidv4 } from "uuid";
 import { runStructuringChain } from "./chains/structuring-chain";
 import { runDiagnosisChain } from "./chains/diagnosis-chain";
@@ -76,24 +77,29 @@ export async function runAgentPipeline(
     triageStatus: "pending", nursingNotes: [],
   };
 
-  // Agent 1: Voice capture
+  // Agent 1: Voice capture — publish immediately so the encounter card appears
+  // in nurse/doctor/paramedic queues before any LLM call begins.
   const voiceResult = agentVoiceCapture(rawText, paramedicId, paramedicName);
   encounter.auditTrail.push(voiceResult.auditEntry);
+  await upsertEncounter(encounter);
 
   // Agent 2: Structuring (LangChain)
   encounter.status = "structuring";
+  await upsertEncounter(encounter);
   const structStart = Date.now();
   const structuredData = await runStructuringChain(rawText);
   encounter.structuredData = structuredData;
   const structAudit = createAuditEntry("structuring", "STRUCTURE_LANGCHAIN",
     `LangChain structuring: chief complaint "${structuredData.chiefComplaint}", ${structuredData.observations.length} observations, ${structuredData.conditions.length} conditions`);
   encounter.auditTrail.push({ ...structAudit, processingTimeMs: Date.now() - structStart } as typeof structAudit);
+  await upsertEncounter(encounter);
 
   // Agent 2.5: Context pull
   encounter.status = "context_loaded";
   const contextResult = agentContextPull();
   encounter.patientContext = contextResult.data;
   encounter.auditTrail.push(contextResult.auditEntry);
+  await upsertEncounter(encounter);
 
   // Agent 7a: Diagnosis (LangChain)
   encounter.status = "diagnosis_complete";
@@ -103,6 +109,7 @@ export async function runAgentPipeline(
   const diagAudit = createAuditEntry("diagnosis", "DIAGNOSE_LANGCHAIN",
     `LangChain diagnosis: ${diagnosis.primary} (confidence: ${(diagnosis.confidence * 100).toFixed(0)}%)`);
   encounter.auditTrail.push({ ...diagAudit, processingTimeMs: Date.now() - diagStart } as typeof diagAudit);
+  await upsertEncounter(encounter);
 
   // Agent 7c: Action planner (LangChain)
   encounter.status = "order_drafted";
@@ -112,6 +119,7 @@ export async function runAgentPipeline(
   const orderAudit = createAuditEntry("action_planner", "PLAN_ORDERS_LANGCHAIN",
     `LangChain action planner: drafted ${draftOrders.length} orders for ${diagnosis.primary}`);
   encounter.auditTrail.push({ ...orderAudit, processingTimeMs: Date.now() - orderStart } as typeof orderAudit);
+  await upsertEncounter(encounter);
 
   // Agent 3: Drug/allergy check (Apify simulation)
   if (encounter.draftOrders && encounter.patientContext) {
@@ -129,6 +137,7 @@ export async function runAgentPipeline(
     encounter.safetyRecommendation = safetyResult.recommendation;
     const safetyAudit = createAuditEntry("safety_controller", "SAFETY_DECISION", safetyResult.recommendation);
     encounter.auditTrail.push(safetyAudit);
+    await upsertEncounter(encounter);
   }
 
   // Agent 9: Case supervisor
@@ -144,6 +153,7 @@ export async function runAgentPipeline(
   const finalAudit = createAuditEntry("audit", "PIPELINE_COMPLETE",
     `Encounter ${encounterId} pipeline complete. Status: ${encounter.status}. Acuity: ${encounter.acuity}. ${encounter.draftOrders?.length ?? 0} orders, ${encounter.safetyFlags?.length ?? 0} safety flags. Engine: LangChain.`);
   encounter.auditTrail.push(finalAudit);
+  await upsertEncounter(encounter);
 
   return encounter;
 }

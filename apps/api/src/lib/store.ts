@@ -3,8 +3,33 @@ import { createServerSupabase } from "@/lib/supabase";
 
 // In-memory fallback (per-lambda) — used only when Supabase is not configured.
 // On Vercel, module state does NOT persist across lambda instances, so any
-// multi-step handoff (paramedic → nurse → doctor) requires the Supabase path.
+// multi-step handoff (paramedic → nurse → doctor) requires the Supabase path
+// for reliable cross-instance updates. With pure in-memory, real-time only
+// works for clients that happen to share the same warm lambda.
 const memory = new Map<string, Encounter>();
+
+// In-process pub/sub for SSE broadcasts. One subscriber per connected client.
+type Listener = (event: StoreEvent) => void;
+export type StoreEvent =
+  | { type: "upsert"; encounter: Encounter }
+  | { type: "delete"; id: string };
+
+const listeners = new Set<Listener>();
+
+export function subscribe(listener: Listener): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function publish(event: StoreEvent) {
+  for (const listener of listeners) {
+    try {
+      listener(event);
+    } catch (err) {
+      console.error("[store] listener error:", err);
+    }
+  }
+}
 
 const TABLE = "encounters";
 
@@ -60,7 +85,7 @@ function rowToEncounter(r: EncounterRow): Encounter {
   };
 }
 
-function encounterToRow(e: Encounter): Omit<EncounterRow, never> {
+function encounterToRow(e: Encounter): EncounterRow {
   return {
     id: e.id,
     status: e.status,
@@ -120,16 +145,18 @@ export async function getAllEncounters(): Promise<Encounter[]> {
 
 export async function upsertEncounter(encounter: Encounter): Promise<Encounter> {
   encounter.updatedAt = new Date().toISOString();
+  // Always keep the local mirror updated so SSE has the freshest copy without an extra read.
+  memory.set(encounter.id, encounter);
+
   const sb = createServerSupabase();
   if (sb) {
     const { error } = await sb.from(TABLE).upsert(encounterToRow(encounter));
     if (error) {
-      console.error("[store] Supabase upsert failed, falling back to memory:", error.message);
-      memory.set(encounter.id, encounter);
+      console.error("[store] Supabase upsert failed, using memory only:", error.message);
     }
-    return encounter;
   }
-  memory.set(encounter.id, encounter);
+
+  publish({ type: "upsert", encounter });
   return encounter;
 }
 
@@ -137,7 +164,14 @@ export async function deleteEncounter(id: string): Promise<boolean> {
   const sb = createServerSupabase();
   if (sb) {
     const { error } = await sb.from(TABLE).delete().eq("id", id);
-    return !error;
+    if (!error) {
+      memory.delete(id);
+      publish({ type: "delete", id });
+      return true;
+    }
+    return false;
   }
-  return memory.delete(id);
+  const ok = memory.delete(id);
+  if (ok) publish({ type: "delete", id });
+  return ok;
 }
