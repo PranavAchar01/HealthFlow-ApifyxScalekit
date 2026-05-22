@@ -114,10 +114,29 @@ export default function NineOneOne() {
     setError(null);
     setResult(null);
     try {
+      // Send the FULL dispatch patient profile so every downstream CRM
+      // (paramedic / nurse / doctor) sees this exact patient appear instantly
+      // instead of falling back to the mock EHR record.
       const res = await fetch(`${API_URL}/api/agents/draft`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer paramedic_sarah" },
-        body: JSON.stringify({ transcript: scenario.transcript }),
+        body: JSON.stringify({
+          transcript: scenario.transcript,
+          patientContext: {
+            patientId: scenario.patientId,
+            name: scenario.name,
+            age: scenario.age,
+            sex: scenario.sex === "M" ? "Male" : "Female",
+            allergies: scenario.allergies,
+            currentMedications: scenario.medications,
+            conditions: scenario.conditions,
+            dob: scenario.dob,
+            phone: scenario.phone,
+            address: scenario.address,
+            email: scenario.email,
+            language: scenario.language,
+          },
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);

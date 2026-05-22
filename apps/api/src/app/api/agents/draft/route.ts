@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { transcript } = body;
+  const { transcript, patientContext } = body;
 
   if (!transcript || typeof transcript !== "string" || transcript.trim().length === 0) {
     return NextResponse.json({ error: "Missing or empty 'transcript' field" }, { status: 400, headers: corsHeaders(origin) });
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   createAuditEntry("identity_auth", "AUTH_VALIDATE", `Paramedic token validated for ${token.name} (${token.userId}). Role: ${token.role}`, token.userId, token.name);
 
-  const encounter = await runAgentPipeline(transcript, token.userId, token.name);
+  const encounter = await runAgentPipeline(transcript, token.userId, token.name, { patientContext });
   await upsertEncounter(encounter);
 
   return NextResponse.json({

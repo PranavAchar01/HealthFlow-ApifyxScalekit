@@ -78,16 +78,29 @@ export default function ParamedicApp() {
   const mrRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  // Live stream — encounters created by 911 dispatch (or any other paramedic)
-  // appear instantly here as the agent pipeline progresses.
+  // Live stream + polling fallback. SSE delivers updates when the paramedic
+  // browser lands on the same lambda as the pipeline; 2s polling covers the
+  // cross-lambda case so dispatches always show up within ~2s.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const es = new EventSource(`${API_URL}/api/encounters/stream`);
+
+    const fetchAll = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/encounters`, {
+          headers: { Authorization: "Bearer paramedic_sarah" },
+        });
+        const data = await res.json();
+        if (Array.isArray(data.encounters)) setLiveEncounters(data.encounters.slice(0, 10));
+      } catch {}
+    };
+
     const upsert = (e: LiveEncounter) => setLiveEncounters(prev => {
       const i = prev.findIndex(x => x.id === e.id);
       if (i === -1) return [e, ...prev].slice(0, 10);
       const next = [...prev]; next[i] = e; return next;
     });
+
+    const es = new EventSource(`${API_URL}/api/encounters/stream`);
     es.addEventListener("snapshot", (ev) => {
       try {
         const { encounters } = JSON.parse((ev as MessageEvent).data) as { encounters: LiveEncounter[] };
@@ -103,7 +116,11 @@ export default function ParamedicApp() {
         setLiveEncounters(prev => prev.filter(e => e.id !== id));
       } catch {}
     });
-    return () => es.close();
+
+    fetchAll();
+    const poll = setInterval(fetchAll, 2000);
+
+    return () => { es.close(); clearInterval(poll); };
   }, []);
 
   const loadIncoming = (e: LiveEncounter) => {

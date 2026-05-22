@@ -72,6 +72,12 @@ export interface PatientContext {
   currentMedications: string[];
   conditions: string[];
   recentLabs?: Record<string, string>;
+  // Extended demographics for CRM display
+  dob?: string;
+  phone?: string;
+  address?: string;
+  email?: string;
+  language?: string;
 }
 
 export interface DrugConflict {

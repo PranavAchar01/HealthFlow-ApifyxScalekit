@@ -58,7 +58,9 @@ export default function DoctorCRM() {
         if (selectedIdRef.current === id) setSelected(null);
       },
     });
-    const poll = setInterval(refresh, 30000);
+    // 2s polling fallback ensures realtime works even when the client lands
+    // on a different Vercel lambda than the one running the pipeline.
+    const poll = setInterval(refresh, 2000);
     return () => { dispose(); clearInterval(poll); };
   }, [refresh]);
 

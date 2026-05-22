@@ -5,6 +5,7 @@ import { createAuditEntry } from "@/lib/audit";
 import { corsHeaders, corsResponse } from "@/lib/cors";
 import { v4 as uuidv4 } from "uuid";
 import type { NursingNote } from "@/types";
+import { runAggregateDiagnosis } from "@/agents/chains/aggregate-diagnosis-chain";
 
 export async function OPTIONS(req: NextRequest) {
   return corsResponse(req.headers.get("origin"));
@@ -80,6 +81,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     encounter.auditTrail.push(audit);
   }
 
+  // Persist the nursing update first so the SSE broadcast goes out immediately.
   await upsertEncounter(encounter);
+
+  // If the nurse contributed new clinical information, re-aggregate the
+  // diagnosis. This runs after the initial upsert so the UI shows the
+  // nurse's note instantly while the LLM is still thinking, then updates
+  // again when the new diagnosis is ready.
+  if (note) {
+    runAggregateDiagnosis(encounter)
+      .then(async (diagnosis) => {
+        encounter.diagnosis = diagnosis;
+        encounter.auditTrail.push(
+          createAuditEntry(
+            "diagnosis", "AGGREGATE_AFTER_NURSE",
+            `Re-aggregated diagnosis after nurse note. Primary: ${diagnosis.primary} (conf ${(diagnosis.confidence * 100).toFixed(0)}%).`,
+            token.userId, token.name
+          )
+        );
+        await upsertEncounter(encounter);
+      })
+      .catch((err) => console.error("[patch] aggregate after nurse note failed:", err));
+  }
+
   return NextResponse.json({ encounter }, { headers: corsHeaders(origin) });
 }

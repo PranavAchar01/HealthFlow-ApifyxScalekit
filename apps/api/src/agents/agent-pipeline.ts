@@ -34,11 +34,14 @@ function agentVoiceCapture(rawText: string, paramedicId: string, paramedicName: 
   return { agentRole: "voice_capture", success: true, data: { rawTranscript: rawText }, processingTimeMs: Date.now() - start, auditEntry: audit };
 }
 
-function agentContextPull(): AgentResult<PatientContext> {
+function agentContextPull(provided?: PatientContext): AgentResult<PatientContext> {
   const start = Date.now();
-  const patient = MOCK_PATIENT_DB.default;
+  // Use the caller-provided context (e.g. from 911 dispatch) when present.
+  // Falls back to the mock DB only when the upstream caller had no patient info.
+  const patient = provided ?? MOCK_PATIENT_DB.default;
+  const source = provided ? "dispatch" : "mock-ehr";
   const audit = createAuditEntry("context_pull", "CONTEXT_PULL",
-    `Retrieved patient context for ${patient.name} (${patient.patientId}). Current medications: ${patient.currentMedications.join(", ")}`);
+    `Retrieved patient context (${source}) for ${patient.name} (${patient.patientId}). Current medications: ${patient.currentMedications.join(", ") || "none"}`);
   return { agentRole: "context_pull", success: true, data: patient, processingTimeMs: Date.now() - start, auditEntry: audit };
 }
 
@@ -65,7 +68,8 @@ function agentCaseSupervisor(encounter: Encounter): AgentResult<{ acuity: Encoun
 export async function runAgentPipeline(
   rawText: string,
   paramedicId: string,
-  paramedicName: string
+  paramedicName: string,
+  opts?: { patientContext?: PatientContext }
 ): Promise<Encounter> {
   const encounterId = uuidv4();
   const now = new Date().toISOString();
@@ -75,6 +79,9 @@ export async function runAgentPipeline(
     createdAt: now, updatedAt: now,
     paramedicId, paramedicName, rawTranscript: rawText, auditTrail: [],
     triageStatus: "pending", nursingNotes: [],
+    // Seed the patient context from the dispatch payload (911) so every CRM
+    // sees the right person the instant the encounter card appears.
+    patientContext: opts?.patientContext,
   };
 
   // Agent 1: Voice capture — publish immediately so the encounter card appears
@@ -94,9 +101,9 @@ export async function runAgentPipeline(
   encounter.auditTrail.push({ ...structAudit, processingTimeMs: Date.now() - structStart } as typeof structAudit);
   await upsertEncounter(encounter);
 
-  // Agent 2.5: Context pull
+  // Agent 2.5: Context pull (uses dispatch-provided context if available)
   encounter.status = "context_loaded";
-  const contextResult = agentContextPull();
+  const contextResult = agentContextPull(opts?.patientContext ?? encounter.patientContext);
   encounter.patientContext = contextResult.data;
   encounter.auditTrail.push(contextResult.auditEntry);
   await upsertEncounter(encounter);
