@@ -29,14 +29,11 @@ Differentials: {differentials}`,
 
 function createActionPlannerChain() {
   try {
-    const model = createChatModel({
-      modelName: "claude-sonnet-4-20250514",
-      temperature: 0,
-      maxTokens: 2000,
-    });
-    return RunnableSequence.from([ACTION_PLANNER_PROMPT, model, new StringOutputParser()]);
-  } catch (error) {
-    console.error("Could not create action planner chain:", error);
+    const model = createChatModel({ modelName: "claude-sonnet-4-20250514", temperature: 0, maxTokens: 2000 });
+    if (!model) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return RunnableSequence.from([ACTION_PLANNER_PROMPT, model as any, new StringOutputParser()]);
+  } catch {
     return null;
   }
 }

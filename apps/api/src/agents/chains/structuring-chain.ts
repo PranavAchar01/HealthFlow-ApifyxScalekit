@@ -23,18 +23,11 @@ Be precise with vital signs. Use standard LOINC codes for observations and ICD-1
 
 function createStructuringChain() {
   try {
-    const model = createChatModel({
-      modelName: "claude-sonnet-4-20250514",
-      temperature: 0,
-      maxTokens: 2000,
-    });
-    return RunnableSequence.from([
-      STRUCTURING_PROMPT,
-      model,
-      new StringOutputParser(),
-    ]);
-  } catch (error) {
-    console.error("Could not create structuring chain:", error);
+    const model = createChatModel({ modelName: "claude-sonnet-4-20250514", temperature: 0, maxTokens: 2000 });
+    if (!model) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return RunnableSequence.from([STRUCTURING_PROMPT, model as any, new StringOutputParser()]);
+  } catch {
     return null;
   }
 }

@@ -1,6 +1,5 @@
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { BaseChatModel } from "@langchain/core/messages";
 
 interface ChatModelParams {
   temperature?: number;
@@ -8,14 +7,14 @@ interface ChatModelParams {
   modelName?: string;
 }
 
-export function createChatModel(params?: ChatModelParams): BaseChatModel {
+export function createChatModel(params?: ChatModelParams) {
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 
   if (geminiApiKey) {
     return new ChatGoogleGenerativeAI({
       apiKey: geminiApiKey,
-      modelName: params?.modelName?.includes("gemini") ? params.modelName : "gemini-pro",
+      model: params?.modelName?.includes("gemini") ? params.modelName : "gemini-1.5-pro",
       temperature: params?.temperature,
       maxOutputTokens: params?.maxTokens,
     });
@@ -24,11 +23,12 @@ export function createChatModel(params?: ChatModelParams): BaseChatModel {
   if (anthropicApiKey) {
     return new ChatAnthropic({
       apiKey: anthropicApiKey,
-      modelName: params?.modelName?.includes("claude") ? params.modelName : "claude-sonnet-4-20250514",
+      model: params?.modelName?.includes("claude") ? params.modelName : "claude-sonnet-4-20250514",
       temperature: params?.temperature,
       maxTokens: params?.maxTokens,
     });
   }
 
-  throw new Error("No API key provided for any chat model. Please set GEMINI_API_KEY or ANTHROPIC_API_KEY.");
+  // No API key — return null so callers fall back to rule-based logic
+  return null;
 }
