@@ -1,11 +1,11 @@
 {
-  "/api/agents/draft/route": "/api/agents/draft",
+  "/_not-found/page": "/_not-found",
   "/api/agents/commit/route": "/api/agents/commit",
+  "/api/auth/users/route": "/api/auth/users",
+  "/api/agents/draft/route": "/api/agents/draft",
   "/api/encounters/[id]/route": "/api/encounters/[id]",
   "/api/encounters/route": "/api/encounters",
-  "/favicon.ico/route": "/favicon.ico",
   "/api/voice/transcribe/route": "/api/voice/transcribe",
-  "/api/auth/users/route": "/api/auth/users",
-  "/_not-found/page": "/_not-found",
+  "/favicon.ico/route": "/favicon.ico",
   "/page": "/"
 }

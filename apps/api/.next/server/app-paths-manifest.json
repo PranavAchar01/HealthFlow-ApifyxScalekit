@@ -1,11 +1,11 @@
 {
-  "/api/agents/draft/route": "app/api/agents/draft/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/api/agents/commit/route": "app/api/agents/commit/route.js",
+  "/api/auth/users/route": "app/api/auth/users/route.js",
+  "/api/agents/draft/route": "app/api/agents/draft/route.js",
   "/api/encounters/[id]/route": "app/api/encounters/[id]/route.js",
   "/api/encounters/route": "app/api/encounters/route.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js",
   "/api/voice/transcribe/route": "app/api/voice/transcribe/route.js",
-  "/api/auth/users/route": "app/api/auth/users/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
   "/page": "app/page.js"
 }
