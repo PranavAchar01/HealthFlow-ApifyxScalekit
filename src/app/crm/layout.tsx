@@ -9,10 +9,10 @@ export default function CrmLayout({ children }: { children: React.ReactNode }) {
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-lg bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center text-white font-bold">
-              GF
+              HF
             </div>
             <div>
-              <h1 className="font-bold text-sm">GuestFlow CRM</h1>
+              <h1 className="font-bold text-sm">HealthFlow CRM</h1>
               <p className="text-xs text-gray-400">Multi-Agent Healthcare Platform</p>
             </div>
           </div>

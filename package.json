@@ -1,5 +1,5 @@
 {
-  "name": "guestflow-healthcare",
+  "name": "healthflow",
   "private": true,
   "packageManager": "npm@11.12.1",
   "workspaces": [
@@ -10,9 +10,9 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "lint": "turbo lint",
-    "dev:api": "turbo dev --filter=@guestflow/api",
-    "dev:paramedic": "turbo dev --filter=@guestflow/paramedic",
-    "dev:doctor": "turbo dev --filter=@guestflow/doctor"
+    "dev:api": "turbo dev --filter=@healthflow/api",
+    "dev:paramedic": "turbo dev --filter=@healthflow/paramedic",
+    "dev:doctor": "turbo dev --filter=@healthflow/doctor"
   },
   "devDependencies": {
     "turbo": "^2.9.14"

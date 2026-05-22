@@ -62,7 +62,7 @@ export default function DoctorCRM() {
           {Array.from({length:9}).map((_,i)=><div key={i} className="w-1.5 h-1.5 bg-white rounded-sm opacity-80"/>)}
         </div>
         <div className="flex items-center gap-1 text-sm">
-          <span className="opacity-60">GuestFlow</span><span className="opacity-30 mx-1">›</span>
+          <span className="opacity-60">HealthFlow</span><span className="opacity-30 mx-1">›</span>
           <span className="opacity-60">Physician</span><span className="opacity-30 mx-1">›</span>
           <span className="font-semibold">{selected?.patientContext?.name ?? "Select Patient"}</span>
         </div>

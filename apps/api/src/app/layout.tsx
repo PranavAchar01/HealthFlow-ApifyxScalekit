@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "GuestFlow API",
-  description: "GuestFlow backend — multi-agent healthcare pipeline",
+  title: "HealthFlow API",
+  description: "HealthFlow backend — multi-agent healthcare pipeline",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -1,11 +1,11 @@
-# GuestFlow Deployment Guide
+# HealthFlow Deployment Guide
 
 ---
 
 ## Quick Deploy (Vercel)
 
 1. Go to [vercel.com/new](https://vercel.com/new)
-2. Import `PranavAchar01/GuestFlow-Healthcare`
+2. Import `PranavAchar01/HealthFlow`
 3. Add environment variables (see below)
 4. Click Deploy
 
@@ -117,8 +117,8 @@ export async function validateToken(token: string): Promise<AuthToken | null> {
 
 ```bash
 # 1. Clone
-git clone https://github.com/PranavAchar01/GuestFlow-Healthcare.git
-cd GuestFlow-Healthcare
+git clone https://github.com/PranavAchar01/HealthFlow.git
+cd HealthFlow
 
 # 2. Install
 npm install
