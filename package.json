@@ -1,36 +1,19 @@
 {
-  "name": "guestflow-app",
-  "version": "0.1.0",
+  "name": "guestflow-healthcare",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.97.1",
-    "@langchain/anthropic": "^1.4.0",
-    "@langchain/community": "^1.1.28",
-    "@langchain/core": "^1.1.48",
-    "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.106.1",
-    "langchain": "^1.4.2",
-    "next": "16.2.6",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "uuid": "^14.0.0",
-    "zod": "^4.4.3"
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "dev:api": "turbo dev --filter=@guestflow/api",
+    "dev:paramedic": "turbo dev --filter=@guestflow/paramedic",
+    "dev:doctor": "turbo dev --filter=@guestflow/doctor"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "@types/uuid": "^10.0.0",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.6",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "turbo": "^2.9.14"
   }
 }

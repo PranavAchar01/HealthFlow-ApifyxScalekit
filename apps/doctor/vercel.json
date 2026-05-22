@@ -1,0 +1,5 @@
+{
+  "buildCommand": "cd ../.. && npx turbo build --filter=@guestflow/doctor",
+  "outputDirectory": "apps/doctor/.next",
+  "installCommand": "npm install"
+}

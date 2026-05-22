@@ -1,0 +1,10 @@
+{
+  "/_global-error/page": "app/_global-error/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/crm/admin/page": "app/crm/admin/page.js",
+  "/crm/audit/page": "app/crm/audit/page.js",
+  "/crm/doctor/page": "app/crm/doctor/page.js",
+  "/crm/field/page": "app/crm/field/page.js",
+  "/crm/page": "app/crm/page.js",
+  "/page": "app/page.js"
+}
