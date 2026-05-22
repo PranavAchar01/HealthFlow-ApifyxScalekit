@@ -8,5 +8,6 @@ export async function OPTIONS(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const origin = req.headers.get("origin");
-  return NextResponse.json({ encounters: getAllEncounters() }, { headers: corsHeaders(origin) });
+  const encounters = await getAllEncounters();
+  return NextResponse.json({ encounters }, { headers: corsHeaders(origin) });
 }

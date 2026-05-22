@@ -43,10 +43,10 @@ export default function ParamedicPage() {
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-blue-500 flex items-center justify-center text-white font-bold text-lg">
-              GF
+              HF
             </div>
             <div>
-              <h1 className="text-white font-bold text-lg">GuestFlow Field</h1>
+              <h1 className="text-white font-bold text-lg">HealthFlow Field</h1>
               <p className="text-blue-300 text-xs">Paramedic Interface</p>
             </div>
           </div>

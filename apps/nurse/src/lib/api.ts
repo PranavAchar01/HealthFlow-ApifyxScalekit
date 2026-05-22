@@ -44,3 +44,45 @@ export async function setTriageStatus(
   });
   return data.encounter;
 }
+
+export type EncounterStreamHandlers = {
+  onSnapshot: (encounters: Encounter[]) => void;
+  onUpsert: (encounter: Encounter) => void;
+  onDelete?: (id: string) => void;
+  onError?: (err: Event) => void;
+};
+
+// EventSource doesn't support custom headers, so the stream endpoint is
+// authenticated by origin (CORS). Returns a disposer.
+export function subscribeToEncounters(handlers: EncounterStreamHandlers): () => void {
+  if (typeof window === "undefined") return () => {};
+  const es = new EventSource(`${API_URL}/api/encounters/stream`);
+
+  es.addEventListener("snapshot", (e) => {
+    try {
+      const data = JSON.parse((e as MessageEvent).data) as { encounters: Encounter[] };
+      handlers.onSnapshot(data.encounters);
+    } catch (err) { console.error("[stream] snapshot parse", err); }
+  });
+
+  es.addEventListener("upsert", (e) => {
+    try {
+      const enc = JSON.parse((e as MessageEvent).data) as Encounter;
+      handlers.onUpsert(enc);
+    } catch (err) { console.error("[stream] upsert parse", err); }
+  });
+
+  es.addEventListener("delete", (e) => {
+    try {
+      const { id } = JSON.parse((e as MessageEvent).data) as { id: string };
+      handlers.onDelete?.(id);
+    } catch (err) { console.error("[stream] delete parse", err); }
+  });
+
+  es.onerror = (err) => {
+    handlers.onError?.(err);
+    // EventSource auto-reconnects; we leave the connection open.
+  };
+
+  return () => es.close();
+}

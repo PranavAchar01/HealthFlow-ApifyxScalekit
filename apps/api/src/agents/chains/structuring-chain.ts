@@ -1,8 +1,8 @@
-import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { RunnableSequence } from "@langchain/core/runnables";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 import { Encounter, Vitals, FHIRObservation, FHIRCondition } from "@/types";
+import { createChatModel } from "@/lib/chat-model-factory";
 
 const STRUCTURING_PROMPT = ChatPromptTemplate.fromMessages([
   [
@@ -22,21 +22,14 @@ Be precise with vital signs. Use standard LOINC codes for observations and ICD-1
 ]);
 
 function createStructuringChain() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey === "your-anthropic-key") return null;
-
-  const model = new ChatAnthropic({
-    modelName: "claude-sonnet-4-20250514",
-    anthropicApiKey: apiKey,
-    temperature: 0,
-    maxTokens: 2000,
-  });
-
-  return RunnableSequence.from([
-    STRUCTURING_PROMPT,
-    model,
-    new StringOutputParser(),
-  ]);
+  try {
+    const model = createChatModel({ modelName: "claude-sonnet-4-20250514", temperature: 0, maxTokens: 2000 });
+    if (!model) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return RunnableSequence.from([STRUCTURING_PROMPT, model as any, new StringOutputParser()]);
+  } catch {
+    return null;
+  }
 }
 
 export function fallbackStructuring(rawText: string): NonNullable<Encounter["structuredData"]> {

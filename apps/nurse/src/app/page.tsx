@@ -1,7 +1,7 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Encounter } from "@/types";
-import { getEncounters, addNursingNote, setTriageStatus } from "@/lib/api";
+import { getEncounters, addNursingNote, setTriageStatus, subscribeToEncounters } from "@/lib/api";
 
 const TRIAGE_OPTS = ["pending","in_assessment","ready_for_doctor","escalated"] as const;
 const NOTE_CATS = ["assessment","vitals_update","medication","escalation","general"] as const;
@@ -26,15 +26,50 @@ export default function NurseStation() {
   const [saving, setSaving] = useState(false);
   const [triaging, setTriaging] = useState(false);
 
+  const selectedIdRef = useRef<string | null>(null);
+  useEffect(() => { selectedIdRef.current = selected?.id ?? null; }, [selected]);
+
   const refresh = useCallback(async () => {
     try {
       const list = await getEncounters();
       setEncounters(list);
-      if (selected) { const u = list.find(e=>e.id===selected.id); if(u) setSelected(u); }
+      if (selectedIdRef.current) {
+        const u = list.find(e=>e.id===selectedIdRef.current);
+        if (u) setSelected(u);
+      }
     } catch {}
-  }, [selected]);
+  }, []);
 
-  useEffect(() => { refresh(); const t = setInterval(refresh, 3000); return ()=>clearInterval(t); }, [refresh]);
+  useEffect(() => {
+    // SSE handles real-time. A 30s poll is a safety net in case the stream
+    // dies and the browser fails to reconnect (e.g., behind certain proxies).
+    refresh();
+    const dispose = subscribeToEncounters({
+      onSnapshot: (list) => {
+        setEncounters(list);
+        if (selectedIdRef.current) {
+          const u = list.find(e=>e.id===selectedIdRef.current);
+          if (u) setSelected(u);
+        }
+      },
+      onUpsert: (enc) => {
+        setEncounters(prev => {
+          const idx = prev.findIndex(e=>e.id===enc.id);
+          if (idx === -1) return [enc, ...prev];
+          const next = [...prev]; next[idx] = enc; return next;
+        });
+        if (selectedIdRef.current === enc.id) setSelected(enc);
+      },
+      onDelete: (id) => {
+        setEncounters(prev => prev.filter(e=>e.id!==id));
+        if (selectedIdRef.current === id) setSelected(null);
+      },
+    });
+    // 2s polling fallback ensures realtime works even when the client lands
+    // on a different Vercel lambda than the one running the pipeline.
+    const poll = setInterval(refresh, 2000);
+    return () => { dispose(); clearInterval(poll); };
+  }, [refresh]);
 
   const handleNote = async () => {
     if (!note.trim() || !selected) return;
@@ -55,7 +90,7 @@ export default function NurseStation() {
   const riskColor = (acuity: string) =>
     acuity==="critical"?"bg-red-500":acuity==="high"?"bg-orange-500":acuity==="medium"?"bg-yellow-500":"bg-green-500";
 
-  const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://guestflow-doctor.vercel.app/crm";
+  const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://guestflow-doctor.vercel.app";
   const v = selected?.structuredData?.vitals ?? {};
 
   return (
@@ -66,7 +101,7 @@ export default function NurseStation() {
           {Array.from({length:9}).map((_,i)=><div key={i} className="w-1.5 h-1.5 bg-white rounded-sm opacity-80"/>)}
         </div>
         <div className="flex items-center gap-1 text-sm">
-          <span className="opacity-60">GuestFlow</span><span className="opacity-30 mx-1">›</span>
+          <span className="opacity-60">HealthFlow</span><span className="opacity-30 mx-1">›</span>
           <span className="opacity-60">Nursing</span><span className="opacity-30 mx-1">›</span>
           <span className="font-semibold">Maria Rodriguez, RN — Bay 3</span>
         </div>

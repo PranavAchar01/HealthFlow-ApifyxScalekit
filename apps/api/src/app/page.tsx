@@ -1,7 +1,7 @@
 export default function ApiStatus() {
   return (
     <div style={{ fontFamily: "monospace", padding: "2rem", maxWidth: "640px", margin: "0 auto" }}>
-      <h1 style={{ margin: "0 0 0.5rem" }}>GuestFlow API</h1>
+      <h1 style={{ margin: "0 0 0.5rem" }}>HealthFlow API</h1>
       <p style={{ color: "#666", margin: "0 0 1.5rem" }}>Multi-agent healthcare pipeline backend — v1</p>
       <hr style={{ margin: "0 0 1.5rem", border: "1px solid #eee" }} />
       <h2 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>Endpoints</h2>

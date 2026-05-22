@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing 'encounterId'" }, { status: 400, headers: corsHeaders(origin) });
   }
 
-  const encounter = getEncounter(encounterId);
+  const encounter = await getEncounter(encounterId);
   if (!encounter) {
     return NextResponse.json({ error: "Encounter not found" }, { status: 404, headers: corsHeaders(origin) });
   }
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     token.userId, token.name);
   encounter.auditTrail.push(finalAudit);
 
-  upsertEncounter(encounter);
+  await upsertEncounter(encounter);
 
   return NextResponse.json({
     success: true, encounter,

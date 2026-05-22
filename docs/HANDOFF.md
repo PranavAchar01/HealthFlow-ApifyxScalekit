@@ -1,8 +1,8 @@
-# GuestFlow Healthcare — Engineering Handoff
+# HealthFlow Healthcare — Engineering Handoff
 
 **Last Updated:** 2026-05-22  
 **Status:** Production-ready, Vercel-deployable  
-**Repo:** https://github.com/PranavAchar01/GuestFlow-Healthcare
+**Repo:** https://github.com/PranavAchar01/HealthFlow
 
 ---
 
@@ -232,7 +232,7 @@ interface Encounter {
 ## Deployment
 
 ### Vercel (Recommended)
-1. Connect `PranavAchar01/GuestFlow-Healthcare` to Vercel
+1. Connect `PranavAchar01/HealthFlow` to Vercel
 2. Add environment variables in Vercel project settings
 3. Deploy — zero configuration needed
 

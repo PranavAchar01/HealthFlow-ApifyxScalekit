@@ -488,7 +488,23 @@ export default function NineOneOne() {
       const res = await fetch(`${API_URL}/api/agents/draft`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer paramedic_sarah" },
-        body: JSON.stringify({ transcript: transcriptText }),
+        body: JSON.stringify({
+          transcript: transcriptText,
+          patientContext: {
+            patientId: scenario.patientId,
+            name: scenario.name,
+            age: scenario.age,
+            sex: scenario.sex === "M" ? "Male" : scenario.sex === "F" ? "Female" : "Unknown",
+            allergies: scenario.allergies,
+            currentMedications: scenario.medications,
+            conditions: scenario.conditions,
+            dob: scenario.dob,
+            phone: scenario.phone,
+            address: scenario.address,
+            email: scenario.email,
+            language: scenario.language,
+          },
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -879,10 +895,11 @@ export default function NineOneOne() {
                           className="block w-full text-center py-2 text-xs font-semibold bg-[#2563a8] text-white rounded hover:bg-[#1e3f7a] transition-colors">
                           Doctor CRM
                         </a>
-                        <a href={`https://guestflow-paramedic.vercel.app`} target="_blank" rel="noopener noreferrer"
+                        <a href="https://healthflow-paramedic.vercel.app" target="_blank" rel="noopener noreferrer"
                           className="block w-full text-center py-2 text-xs font-semibold border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors">
                           Paramedic View
                         </a>
+
                       </div>
                     </div>
                   )}
