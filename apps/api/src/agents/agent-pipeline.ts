@@ -6,6 +6,7 @@ import { runStructuringChain } from "./chains/structuring-chain";
 import { runDiagnosisChain } from "./chains/diagnosis-chain";
 import { runActionPlannerChain } from "./chains/action-planner-chain";
 import { runDrugAllergyCheck, runSafetyController } from "./chains/safety-chain";
+import { runNurseAssessmentChain } from "./chains/nurse-assessment-chain";
 
 const MOCK_PATIENT_DB: Record<string, PatientContext> = {
   default: {
@@ -144,6 +145,15 @@ export async function runAgentPipeline(
   const caseResult = agentCaseSupervisor(encounter);
   encounter.acuity = caseResult.data?.acuity ?? "medium";
   encounter.auditTrail.push(caseResult.auditEntry);
+
+  // Agent 10: Nurse Assessment (AI-generated triage)
+  const nurseStart = Date.now();
+  const nurseAssessment = await runNurseAssessmentChain(encounter);
+  encounter.nurseAssessment = nurseAssessment;
+  const nurseAudit = createAuditEntry("nurse_assessment", "NURSE_TRIAGE",
+    `AI nurse assessment: ${nurseAssessment.acuity_level}, Room ${nurseAssessment.room_assignment}, Priority ${nurseAssessment.priority_rank}. ${nurseAssessment.specialist_consult_needed ? `Consult: ${nurseAssessment.specialist_consult_needed}.` : "No specialist consult."} ${nurseAssessment.equipment_requested.length} equipment items, ${nurseAssessment.follow_up_tests.length} follow-up tests.`);
+  encounter.auditTrail.push({ ...nurseAudit, processingTimeMs: Date.now() - nurseStart } as typeof nurseAudit);
+  await upsertEncounter(encounter);
 
   // Set final status
   const hasBlocked = encounter.draftOrders?.some((o) => o.status === "blocked");

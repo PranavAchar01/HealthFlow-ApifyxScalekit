@@ -48,6 +48,7 @@ type EncounterRow = {
   draft_orders: Encounter["draftOrders"] | null;
   safety_flags: Encounter["safetyFlags"] | null;
   safety_recommendation: string | null;
+  nurse_assessment: Encounter["nurseAssessment"] | null;
   nursing_notes: NursingNote[] | null;
   triage_status: Encounter["triageStatus"] | null;
   nurse_id: string | null;
@@ -74,6 +75,7 @@ function rowToEncounter(r: EncounterRow): Encounter {
     draftOrders: r.draft_orders ?? undefined,
     safetyFlags: r.safety_flags ?? undefined,
     safetyRecommendation: r.safety_recommendation ?? undefined,
+    nurseAssessment: r.nurse_assessment ?? undefined,
     nursingNotes: r.nursing_notes ?? undefined,
     triageStatus: r.triage_status ?? undefined,
     nurseId: r.nurse_id ?? undefined,
@@ -101,6 +103,7 @@ function encounterToRow(e: Encounter): EncounterRow {
     draft_orders: e.draftOrders ?? null,
     safety_flags: e.safetyFlags ?? null,
     safety_recommendation: e.safetyRecommendation ?? null,
+    nurse_assessment: e.nurseAssessment ?? null,
     nursing_notes: e.nursingNotes ?? null,
     triage_status: e.triageStatus ?? null,
     nurse_id: e.nurseId ?? null,

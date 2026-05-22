@@ -6,16 +6,29 @@ import { getEncounters, addNursingNote, setTriageStatus, subscribeToEncounters }
 const TRIAGE_OPTS = ["pending","in_assessment","ready_for_doctor","escalated"] as const;
 const NOTE_CATS = ["assessment","vitals_update","medication","escalation","general"] as const;
 
-function Panel({ title, children, className="" }: { title:string; children:React.ReactNode; className?:string }) {
+function Panel({ title, badge, children, className="" }: { title:string; badge?:React.ReactNode; children:React.ReactNode; className?:string }) {
   return (
     <div className={`bg-white border border-gray-200 rounded flex flex-col ${className}`}>
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 flex-shrink-0">
-        <span className="text-[#00a99d] font-bold text-xs tracking-widest uppercase">{title}</span>
-        <button className="text-[#2563a8] text-base font-bold leading-none">+</button>
+        <div className="flex items-center gap-2">
+          <span className="text-[#00a99d] font-bold text-xs tracking-widest uppercase">{title}</span>
+          {badge}
+        </div>
       </div>
       <div className="flex-1 overflow-auto">{children}</div>
     </div>
   );
+}
+
+function ESIBadge({ level }: { level: string }) {
+  const colors: Record<string,string> = {
+    "ESI-1": "bg-red-600 text-white",
+    "ESI-2": "bg-orange-500 text-white",
+    "ESI-3": "bg-yellow-500 text-white",
+    "ESI-4": "bg-blue-500 text-white",
+    "ESI-5": "bg-green-500 text-white",
+  };
+  return <span className={`text-xs font-bold px-2 py-0.5 rounded ${colors[level] ?? "bg-gray-200 text-gray-700"}`}>{level}</span>;
 }
 
 export default function NurseStation() {
@@ -41,8 +54,6 @@ export default function NurseStation() {
   }, []);
 
   useEffect(() => {
-    // SSE handles real-time. A 30s poll is a safety net in case the stream
-    // dies and the browser fails to reconnect (e.g., behind certain proxies).
     refresh();
     const dispose = subscribeToEncounters({
       onSnapshot: (list) => {
@@ -90,6 +101,7 @@ export default function NurseStation() {
 
   const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://guestflow-doctor.vercel.app";
   const v = selected?.structuredData?.vitals ?? {};
+  const na = selected?.nurseAssessment;
 
   return (
     <div className="h-screen flex flex-col bg-gray-100 overflow-hidden" style={{fontFamily:"'Segoe UI',system-ui,sans-serif",fontSize:"13px"}}>
@@ -99,9 +111,9 @@ export default function NurseStation() {
           {Array.from({length:9}).map((_,i)=><div key={i} className="w-1.5 h-1.5 bg-white rounded-sm opacity-80"/>)}
         </div>
         <div className="flex items-center gap-1 text-sm">
-          <span className="opacity-60">HealthFlow</span><span className="opacity-30 mx-1">›</span>
-          <span className="opacity-60">Nursing</span><span className="opacity-30 mx-1">›</span>
-          <span className="font-semibold">Maria Rodriguez, RN — Bay 3</span>
+          <span className="opacity-60">HealthFlow</span><span className="opacity-30 mx-1">&rsaquo;</span>
+          <span className="opacity-60">Nursing</span><span className="opacity-30 mx-1">&rsaquo;</span>
+          <span className="font-semibold">Maria Rodriguez, RN &mdash; Bay 3</span>
         </div>
         <div className="ml-auto flex items-center gap-3 text-sm opacity-70">
           <span>🔍</span><span>⚙</span>
@@ -115,8 +127,8 @@ export default function NurseStation() {
           <button key={a} className="text-xs font-medium px-3 h-7 rounded border border-white/20 hover:bg-white/10 transition-colors">{a}</button>
         ))}
         <div className="ml-auto flex gap-4 text-xs">
-          {[["Total",encounters.length,"text-white"],["Critical",critical,"text-red-300"],["Pending",pending,"text-yellow-200"],["For Doctor",forDoctor,"text-orange-300"]].map(([l,v,c])=>(
-            <span key={String(l)} className="flex items-center gap-1"><strong className={String(c)}>{String(v)}</strong><span className="opacity-60">{String(l)}</span></span>
+          {[["Total",encounters.length,"text-white"],["Critical",critical,"text-red-300"],["Pending",pending,"text-yellow-200"],["For Doctor",forDoctor,"text-orange-300"]].map(([l,val,c])=>(
+            <span key={String(l)} className="flex items-center gap-1"><strong className={String(c)}>{String(val)}</strong><span className="opacity-60">{String(l)}</span></span>
           ))}
         </div>
       </div>
@@ -125,17 +137,23 @@ export default function NurseStation() {
       {selected && (
         <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4 flex-shrink-0">
           <div className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-            {selected.patientContext?.name.split(" ").map(n=>n[0]).join("") ?? "?"}
+            {selected.patientContext?.name?.split(" ").map(n=>n[0]).join("") ?? "?"}
           </div>
           <div className="flex-1">
             <p className="text-xs text-gray-400 uppercase tracking-wide">PATIENT</p>
             <p className="text-lg font-bold text-gray-900">{selected.patientContext?.name ?? "Unknown"}</p>
-            <p className="text-xs text-gray-500">{selected.structuredData?.chiefComplaint} · via {selected.paramedicName}</p>
+            <p className="text-xs text-gray-500">{selected.structuredData?.chiefComplaint} &middot; via {selected.paramedicName}</p>
           </div>
           <div className="flex gap-5 text-xs">
             <div><p className="text-gray-400">Age / Sex</p><p className="font-semibold">{selected.patientContext?.age}yo {selected.patientContext?.sex}</p></div>
-            <div><p className="text-gray-400">Preferred Contact</p><p className="font-semibold">Secure Message</p></div>
-            <div><p className="text-gray-400">Language</p><p className="font-semibold">English</p></div>
+            {na && (
+              <>
+                <div><p className="text-gray-400">Room</p><p className="font-semibold text-blue-700">{na.room_assignment}</p></div>
+                <div><p className="text-gray-400">Bed</p><p className="font-semibold">{na.bed_assignment}</p></div>
+                <div><p className="text-gray-400">ESI Level</p><ESIBadge level={na.acuity_level} /></div>
+                <div><p className="text-gray-400">Wait Time</p><p className="font-semibold">{na.estimated_wait_time}</p></div>
+              </>
+            )}
             <div><p className="text-gray-400">Triage Status</p>
               <select value={selected.triageStatus ?? "pending"} onChange={e=>handleTriage(e.target.value)} disabled={triaging}
                 className="text-xs font-semibold border-0 bg-transparent cursor-pointer focus:outline-none text-blue-700">
@@ -166,11 +184,12 @@ export default function NurseStation() {
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-900 text-xs truncate">{e.patientContext?.name ?? "Unknown"}</p>
-                      <p className="text-gray-500 text-xs truncate">{e.structuredData?.chiefComplaint ?? "Processing…"}</p>
+                      <p className="text-gray-500 text-xs truncate">{e.structuredData?.chiefComplaint ?? "Processing..."}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1 mt-1">
                     <span className={`text-xs px-1.5 rounded font-medium text-white ${riskColor(e.acuity)}`}>{e.acuity}</span>
+                    {e.nurseAssessment && <span className="text-xs text-teal-600 font-medium">{e.nurseAssessment.acuity_level}</span>}
                     {(e.safetyFlags?.length??0)>0 && <span className="text-xs text-red-600 font-bold">⚠{e.safetyFlags!.length}</span>}
                     <span className="text-xs text-gray-400 ml-auto">{new Date(e.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span>
                   </div>
@@ -184,10 +203,11 @@ export default function NurseStation() {
         <div className="flex-1 min-w-0 flex flex-col gap-3">
           {selected ? (
             <>
+              {/* Vitals Row */}
               <Panel title="Vital Signs">
                 <div className="px-3 py-2">
                   <div className="grid grid-cols-6 gap-2">
-                    {[["Heart Rate",v.heartRate,"bpm","8867-4"],["Blood Pressure",v.bloodPressure,"mmHg","85354-9"],["SpO₂",v.spO2,"%","2708-6"],["Temp",v.temperature,"°F","8310-5"],["Resp Rate",v.respiratoryRate,"/min","9279-1"],["GCS",v.gcs,"/15","9269-2"]].map(([l,val,u])=>(
+                    {([["Heart Rate",v.heartRate,"bpm"],["Blood Pressure",v.bloodPressure,"mmHg"],["SpO₂",v.spO2,"%"],["Temp",v.temperature,"°F"],["Resp Rate",v.respiratoryRate,"/min"],["GCS",v.gcs,"/15"]] as const).map(([l,val,u])=>(
                       <div key={String(l)} className={`border rounded p-2 text-center ${val?"border-gray-200":"border-dashed border-gray-200 opacity-50"}`}>
                         <p className="text-xs text-gray-400">{l}</p>
                         <p className="text-base font-bold text-gray-900">{val ?? "—"}</p>
@@ -198,69 +218,179 @@ export default function NurseStation() {
                 </div>
               </Panel>
 
-              <div className="flex gap-3 flex-1 min-h-0">
-                <Panel title="AI Clinical Assessment" className="flex-1">
-                  <div className="px-3 py-2 space-y-3 text-xs overflow-auto h-full">
-                    {selected.diagnosis ? (
-                      <>
-                        <div className="pb-2 border-b border-gray-100">
-                          <p className="text-gray-400 mb-0.5">Primary Diagnosis</p>
-                          <p className="font-bold text-blue-700 text-sm">{selected.diagnosis.primary}</p>
-                          <p className="text-gray-400">ICD-10: {selected.diagnosis.icdCode}</p>
-                        </div>
-                        <div>
-                          <div className="flex justify-between mb-1"><span className="text-gray-400">Confidence</span><span className="font-medium">{(selected.diagnosis.confidence*100).toFixed(0)}%</span></div>
-                          <div className="h-2 bg-gray-200 rounded-full"><div className="h-2 bg-blue-500 rounded-full" style={{width:`${selected.diagnosis.confidence*100}%`}}/></div>
-                        </div>
-                        <div><p className="text-gray-400 mb-1">Reasoning</p><p className="text-gray-700 leading-relaxed">{selected.diagnosis.reasoning}</p></div>
-                        <div>
-                          <p className="text-gray-400 mb-1">Differentials</p>
-                          <table className="w-full"><tbody>
-                            {selected.diagnosis.differentials.map((d,i)=>(
-                              <tr key={i} className="border-b border-gray-50 last:border-0">
-                                <td className="py-1 text-gray-700">{d.condition}</td>
-                                <td className="py-1 text-right text-gray-500">{(d.probability*100).toFixed(0)}%</td>
-                              </tr>
-                            ))}
-                          </tbody></table>
-                        </div>
-                        {(selected.safetyFlags?.length??0)>0 && (
-                          <div className="border-t border-gray-100 pt-2">
-                            <p className="font-bold text-red-600 uppercase mb-1">⚠ Safety Flags</p>
-                            {selected.safetyFlags!.map((f,i)=>(
-                              <div key={i} className="bg-red-50 border border-red-100 rounded p-2 mb-1">
-                                <p className="font-bold text-red-700">{f.severity.toUpperCase()}: {f.drug}</p>
-                                <p className="text-red-600">{f.description}</p>
-                                {f.alternative && <p className="text-emerald-700 font-medium">Alt: {f.alternative}</p>}
-                              </div>
-                            ))}
+              {/* AI Nurse Assessment — Main Feature */}
+              {na ? (
+                <Panel title="AI Nurse Assessment" badge={<ESIBadge level={na.acuity_level} />} className="flex-1">
+                  <div className="px-3 py-2 overflow-auto h-full space-y-3 text-xs">
+                    {/* Override / Isolation Alerts */}
+                    {(na.override_flag || na.isolation_required) && (
+                      <div className="flex gap-2">
+                        {na.override_flag && (
+                          <div className="flex-1 bg-red-50 border border-red-200 rounded p-2 flex items-center gap-2">
+                            <span className="text-red-600 font-bold text-sm">⚠</span>
+                            <span className="text-red-700 font-bold">OVERRIDE FLAG — Manual physician review required</span>
                           </div>
                         )}
-                      </>
-                    ) : <p className="text-gray-400 italic">No diagnosis available</p>}
-                  </div>
-                </Panel>
+                        {na.isolation_required && (
+                          <div className="flex-1 bg-yellow-50 border border-yellow-200 rounded p-2 flex items-center gap-2">
+                            <span className="text-yellow-600 font-bold text-sm">🔒</span>
+                            <span className="text-yellow-700 font-bold">ISOLATION REQUIRED</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                <Panel title="Patient History" className="w-44 flex-shrink-0">
-                  <div className="px-3 py-2 space-y-3 text-xs">
-                    <div><p className="text-gray-400 mb-1">Allergies</p>
-                      {selected.patientContext?.allergies.length ? selected.patientContext.allergies.map(a=>(
-                        <div key={a} className="flex items-center gap-1 text-red-700 mb-0.5"><span className="w-1.5 h-1.5 bg-red-400 rounded-full flex-shrink-0"/>{a}</div>
-                      )) : <p className="text-gray-400 italic">None known</p>}
+                    {/* Intake Notes */}
+                    <div className="bg-teal-50 border border-teal-200 rounded p-2.5">
+                      <p className="text-teal-700 font-bold uppercase text-xs mb-1">Intake Notes</p>
+                      <p className="text-gray-800 leading-relaxed">{na.intake_notes}</p>
                     </div>
-                    <div><p className="text-gray-400 mb-1">Current Medications</p>
-                      {selected.patientContext?.currentMedications.map(m=>(
-                        <div key={m} className="flex items-center gap-1 text-gray-700 mb-0.5"><span className="w-1.5 h-1.5 bg-purple-400 rounded-full flex-shrink-0"/>{m}</div>
-                      )) ?? <p className="text-gray-400 italic">None</p>}
+
+                    {/* Key Metrics Grid */}
+                    <div className="grid grid-cols-4 gap-2">
+                      <div className="border rounded p-2 text-center">
+                        <p className="text-gray-400">Priority</p>
+                        <p className={`text-xl font-bold ${na.priority_rank <= 2 ? "text-red-600" : na.priority_rank === 3 ? "text-orange-600" : "text-green-600"}`}>#{na.priority_rank}</p>
+                      </div>
+                      <div className="border rounded p-2 text-center">
+                        <p className="text-gray-400">Triage</p>
+                        <p className="text-sm font-bold text-gray-900">{na.triage_category}</p>
+                      </div>
+                      <div className="border rounded p-2 text-center">
+                        <p className="text-gray-400">Arrival</p>
+                        <p className="text-sm font-bold text-gray-900 capitalize">{na.patient_arrival_status}</p>
+                      </div>
+                      <div className="border rounded p-2 text-center">
+                        <p className="text-gray-400">Est. Wait</p>
+                        <p className="text-sm font-bold text-blue-700">{na.estimated_wait_time}</p>
+                      </div>
                     </div>
-                    <div><p className="text-gray-400 mb-1">Conditions</p>
-                      {selected.patientContext?.conditions.map(c=>(
-                        <div key={c} className="flex items-center gap-1 text-gray-700 mb-0.5"><span className="w-1.5 h-1.5 bg-blue-400 rounded-full flex-shrink-0"/>{c}</div>
-                      )) ?? <p className="text-gray-400 italic">None</p>}
+
+                    {/* Room + Equipment Row */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-gray-400 font-medium uppercase mb-1">Room / Bed Assignment</p>
+                        <div className="bg-blue-50 border border-blue-200 rounded p-2">
+                          <p className="font-bold text-blue-800">{na.room_assignment}</p>
+                          <p className="text-blue-600">{na.bed_assignment}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 font-medium uppercase mb-1">Equipment Requested ({na.equipment_requested.length})</p>
+                        <div className="bg-gray-50 border rounded p-2 space-y-0.5 max-h-20 overflow-auto">
+                          {na.equipment_requested.map((eq,i)=>(
+                            <div key={i} className="flex items-center gap-1 text-gray-700">
+                              <span className="w-1.5 h-1.5 bg-teal-400 rounded-full flex-shrink-0"/>
+                              {eq}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Follow-up Tests + Specialist */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-gray-400 font-medium uppercase mb-1">Follow-Up Tests ({na.follow_up_tests.length})</p>
+                        <div className="bg-gray-50 border rounded p-2 space-y-0.5 max-h-20 overflow-auto">
+                          {na.follow_up_tests.map((t,i)=>(
+                            <div key={i} className="flex items-center gap-1 text-gray-700">
+                              <span className="w-1.5 h-1.5 bg-purple-400 rounded-full flex-shrink-0"/>
+                              {t}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-gray-400 font-medium uppercase mb-1">Specialist Consult</p>
+                          <div className={`border rounded p-2 ${na.specialist_consult_needed ? "bg-orange-50 border-orange-200" : "bg-green-50 border-green-200"}`}>
+                            <p className={`font-medium ${na.specialist_consult_needed ? "text-orange-700" : "text-green-700"}`}>
+                              {na.specialist_consult_needed ?? "None required"}
+                            </p>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-gray-400 font-medium uppercase mb-1">Family Notifications</p>
+                          <p className="text-gray-700 bg-gray-50 border rounded p-2">{na.family_notifications}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Nurse Observations */}
+                    <div>
+                      <p className="text-gray-400 font-medium uppercase mb-1">Nurse Observations</p>
+                      <p className="text-gray-800 bg-gray-50 border rounded p-2 leading-relaxed">{na.nurse_observations}</p>
+                    </div>
+
+                    {/* Handoff to Doctor */}
+                    <div className="bg-blue-50 border-2 border-blue-300 rounded p-2.5">
+                      <p className="text-blue-800 font-bold uppercase text-xs mb-1">Handoff to Doctor (SBAR)</p>
+                      <p className="text-blue-900 leading-relaxed">{na.handoff_to_doctor}</p>
                     </div>
                   </div>
                 </Panel>
-              </div>
+              ) : (
+                <div className="flex-1 flex gap-3">
+                  <Panel title="AI Clinical Assessment" className="flex-1">
+                    <div className="px-3 py-2 space-y-3 text-xs overflow-auto h-full">
+                      {selected.diagnosis ? (
+                        <>
+                          <div className="pb-2 border-b border-gray-100">
+                            <p className="text-gray-400 mb-0.5">Primary Diagnosis</p>
+                            <p className="font-bold text-blue-700 text-sm">{selected.diagnosis.primary}</p>
+                            <p className="text-gray-400">ICD-10: {selected.diagnosis.icdCode}</p>
+                          </div>
+                          <div>
+                            <div className="flex justify-between mb-1"><span className="text-gray-400">Confidence</span><span className="font-medium">{(selected.diagnosis.confidence*100).toFixed(0)}%</span></div>
+                            <div className="h-2 bg-gray-200 rounded-full"><div className="h-2 bg-blue-500 rounded-full" style={{width:`${selected.diagnosis.confidence*100}%`}}/></div>
+                          </div>
+                          <div><p className="text-gray-400 mb-1">Reasoning</p><p className="text-gray-700 leading-relaxed">{selected.diagnosis.reasoning}</p></div>
+                          {(selected.safetyFlags?.length??0)>0 && (
+                            <div className="border-t border-gray-100 pt-2">
+                              <p className="font-bold text-red-600 uppercase mb-1">⚠ Safety Flags</p>
+                              {selected.safetyFlags!.map((f,i)=>(
+                                <div key={i} className="bg-red-50 border border-red-100 rounded p-2 mb-1">
+                                  <p className="font-bold text-red-700">{f.severity.toUpperCase()}: {f.drug}</p>
+                                  <p className="text-red-600">{f.description}</p>
+                                  {f.alternative && <p className="text-emerald-700 font-medium">Alt: {f.alternative}</p>}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center">
+                            <svg className="animate-spin h-6 w-6 mx-auto mb-2 text-teal-500" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            <p className="text-gray-400">AI assessment generating...</p>
+                            <p className="text-gray-300 text-xs mt-1">Nurse triage data will appear here in real-time</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Panel>
+                  <Panel title="Patient History" className="w-44 flex-shrink-0">
+                    <div className="px-3 py-2 space-y-3 text-xs">
+                      <div><p className="text-gray-400 mb-1">Allergies</p>
+                        {selected.patientContext?.allergies.length ? selected.patientContext.allergies.map(a=>(
+                          <div key={a} className="flex items-center gap-1 text-red-700 mb-0.5"><span className="w-1.5 h-1.5 bg-red-400 rounded-full flex-shrink-0"/>{a}</div>
+                        )) : <p className="text-gray-400 italic">None known</p>}
+                      </div>
+                      <div><p className="text-gray-400 mb-1">Current Medications</p>
+                        {selected.patientContext?.currentMedications.map(m=>(
+                          <div key={m} className="flex items-center gap-1 text-gray-700 mb-0.5"><span className="w-1.5 h-1.5 bg-purple-400 rounded-full flex-shrink-0"/>{m}</div>
+                        )) ?? <p className="text-gray-400 italic">None</p>}
+                      </div>
+                      <div><p className="text-gray-400 mb-1">Conditions</p>
+                        {selected.patientContext?.conditions.map(c=>(
+                          <div key={c} className="flex items-center gap-1 text-gray-700 mb-0.5"><span className="w-1.5 h-1.5 bg-blue-400 rounded-full flex-shrink-0"/>{c}</div>
+                        )) ?? <p className="text-gray-400 italic">None</p>}
+                      </div>
+                    </div>
+                  </Panel>
+                </div>
+              )}
             </>
           ) : (
             <div className="flex-1 bg-white border border-gray-200 rounded flex items-center justify-center">
@@ -269,7 +399,7 @@ export default function NurseStation() {
           )}
         </div>
 
-        {/* RIGHT: Nursing Notes */}
+        {/* RIGHT: Nursing Notes + Handoff */}
         <div className="w-56 flex-shrink-0 flex flex-col gap-3">
           <Panel title={`Nursing Notes (${selected?.nursingNotes?.length??0})`} className="flex-1">
             {selected ? (
@@ -296,46 +426,22 @@ export default function NurseStation() {
                       </button>
                     ))}
                   </div>
-                  <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Add nursing note…" rows={3}
+                  <textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Add nursing note..." rows={3}
                     className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 resize-none focus:border-teal-500 focus:ring-1 focus:ring-teal-200 mb-1.5"/>
                   <button onClick={handleNote} disabled={!note.trim()||saving}
                     className="w-full py-1.5 bg-teal-600 text-white text-xs font-semibold rounded hover:bg-teal-700 disabled:opacity-50 transition-colors">
-                    {saving?"Saving…":"Add Note"}
+                    {saving?"Saving...":"Add Note"}
                   </button>
                 </div>
               </>
             ) : <p className="text-xs text-gray-400 italic text-center py-6">Select a patient</p>}
           </Panel>
 
-          <Panel title="Appointments" className="flex-shrink-0">
-            <div className="px-3 py-1 text-xs">
-              <table className="w-full">
-                <thead><tr className="border-b border-gray-100">
-                  <th className="text-left py-1 text-gray-400 font-medium">Time</th>
-                  <th className="text-left py-1 text-gray-400 font-medium">Type</th>
-                  <th className="text-right py-1 text-gray-400 font-medium">Status</th>
-                </tr></thead>
-                <tbody>
-                  {selected ? [
-                    [new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}),"ED Triage","IN PROGRESS"],
-                    ["Pending","Physician Review","SCHEDULED"],
-                  ].map(([t,type,s])=>(
-                    <tr key={String(t)} className="border-b border-gray-50">
-                      <td className="py-1 text-gray-600">{t}</td>
-                      <td className="py-1 text-gray-700">{type}</td>
-                      <td className="py-1 text-right"><span className={`text-xs font-bold ${s==="IN PROGRESS"?"text-green-600":s==="SCHEDULED"?"text-blue-600":"text-gray-500"}`}>{s}</span></td>
-                    </tr>
-                  )) : <tr><td colSpan={3} className="py-3 text-center text-gray-400 italic">No patient selected</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </Panel>
-
           <Panel title="Handoff" className="flex-shrink-0">
             <div className="px-3 py-2">
               <a href={DOCTOR_URL} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 px-3 py-2 bg-[#2563a8] text-white rounded text-xs font-semibold hover:bg-[#1e3f7a] transition-colors">
-                <span>👨‍⚕️</span><span>Send to Doctor CRM</span><span className="ml-auto">›</span>
+                <span>👨‍⚕️</span><span>Send to Doctor CRM</span><span className="ml-auto">&rsaquo;</span>
               </a>
             </div>
           </Panel>

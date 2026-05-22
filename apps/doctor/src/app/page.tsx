@@ -3,16 +3,29 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import type { Encounter } from "@/types";
 import { getEncounters, commitEncounter, subscribeToEncounters } from "@/lib/api";
 
-function Panel({ title, children, className="" }: { title:string; children:React.ReactNode; className?:string }) {
+function Panel({ title, badge, children, className="" }: { title:string; badge?:React.ReactNode; children:React.ReactNode; className?:string }) {
   return (
     <div className={`bg-white border border-gray-200 rounded flex flex-col ${className}`}>
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 flex-shrink-0">
-        <span className="text-[#00a99d] font-bold text-xs tracking-widest uppercase">{title}</span>
-        <button className="text-[#2563a8] text-base font-bold leading-none">+</button>
+        <div className="flex items-center gap-2">
+          <span className="text-[#00a99d] font-bold text-xs tracking-widest uppercase">{title}</span>
+          {badge}
+        </div>
       </div>
       <div className="flex-1 overflow-auto">{children}</div>
     </div>
   );
+}
+
+function ESIBadge({ level }: { level: string }) {
+  const colors: Record<string,string> = {
+    "ESI-1": "bg-red-600 text-white",
+    "ESI-2": "bg-orange-500 text-white",
+    "ESI-3": "bg-yellow-500 text-white",
+    "ESI-4": "bg-blue-500 text-white",
+    "ESI-5": "bg-green-500 text-white",
+  };
+  return <span className={`text-xs font-bold px-2 py-0.5 rounded ${colors[level] ?? "bg-gray-200 text-gray-700"}`}>{level}</span>;
 }
 
 export default function DoctorCRM() {
@@ -83,6 +96,7 @@ export default function DoctorCRM() {
     consult:"bg-gray-100 text-gray-700",
   };
   const v = selected?.structuredData?.vitals ?? {};
+  const na = selected?.nurseAssessment;
   const isApproved = selected?.status === "committed" || selected?.status === "approved";
 
   return (
@@ -93,8 +107,8 @@ export default function DoctorCRM() {
           {Array.from({length:9}).map((_,i)=><div key={i} className="w-1.5 h-1.5 bg-white rounded-sm opacity-80"/>)}
         </div>
         <div className="flex items-center gap-1 text-sm">
-          <span className="opacity-60">HealthFlow</span><span className="opacity-30 mx-1">›</span>
-          <span className="opacity-60">Physician</span><span className="opacity-30 mx-1">›</span>
+          <span className="opacity-60">HealthFlow</span><span className="opacity-30 mx-1">&rsaquo;</span>
+          <span className="opacity-60">Physician</span><span className="opacity-30 mx-1">&rsaquo;</span>
           <span className="font-semibold">{selected?.patientContext?.name ?? "Select Patient"}</span>
         </div>
         <div className="ml-auto flex items-center gap-3 text-sm opacity-70">
@@ -107,14 +121,14 @@ export default function DoctorCRM() {
       <div className="bg-[#2563a8] text-white flex items-center h-9 px-3 gap-1 flex-shrink-0">
         <button onClick={handleApprove} disabled={!selected||approving||isApproved}
           className="text-xs font-semibold px-4 h-7 rounded border border-white/40 bg-white/10 hover:bg-white/20 disabled:opacity-50 transition-colors">
-          {approving?"⏳ APPROVING…":"✅ APPROVE ORDERS"}
+          {approving?"⏳ APPROVING...":"✅ APPROVE ORDERS"}
         </button>
         {["📋 VIEW AUDIT","🖨 PRINT ORDERS","📤 REQUEST CONSULT","🗑 REJECT ENCOUNTER","🔄 REFRESH"].map(a=>(
           <button key={a} className="text-xs font-medium px-3 h-7 rounded border border-white/20 hover:bg-white/10 transition-colors">{a}</button>
         ))}
         <div className="ml-auto flex gap-4 text-xs">
-          {[["Total",encounters.length,"text-white"],["Pending",pending.length,"text-red-300"],["Committed",encounters.filter(e=>e.status==="committed").length,"text-green-300"]].map(([l,v,c])=>(
-            <span key={String(l)} className="flex items-center gap-1"><strong className={String(c)}>{String(v)}</strong><span className="opacity-60">{String(l)}</span></span>
+          {[["Total",encounters.length,"text-white"],["Pending",pending.length,"text-red-300"],["Committed",encounters.filter(e=>e.status==="committed").length,"text-green-300"]].map(([l,val,c])=>(
+            <span key={String(l)} className="flex items-center gap-1"><strong className={String(c)}>{String(val)}</strong><span className="opacity-60">{String(l)}</span></span>
           ))}
         </div>
       </div>
@@ -123,16 +137,22 @@ export default function DoctorCRM() {
       {selected && (
         <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-4 flex-shrink-0">
           <div className="w-12 h-12 rounded-full bg-blue-700 text-white flex items-center justify-center font-bold text-sm flex-shrink-0">
-            {selected.patientContext?.name.split(" ").map(n=>n[0]).join("") ?? "?"}
+            {selected.patientContext?.name?.split(" ").map(n=>n[0]).join("") ?? "?"}
           </div>
           <div className="flex-1">
             <p className="text-xs text-gray-400 uppercase tracking-wide">PATIENT</p>
             <p className="text-lg font-bold text-gray-900">{selected.patientContext?.name ?? "Unknown"}</p>
-            <p className="text-xs text-gray-500">{selected.structuredData?.chiefComplaint} · {selected.patientContext?.patientId}</p>
+            <p className="text-xs text-gray-500">{selected.structuredData?.chiefComplaint} &middot; {selected.patientContext?.patientId}</p>
           </div>
           <div className="flex gap-5 text-xs">
-            <div><p className="text-gray-400">Preferred Contact</p><p className="font-semibold">Secure Message</p></div>
-            <div><p className="text-gray-400">Language</p><p className="font-semibold">English</p></div>
+            {na && (
+              <>
+                <div><p className="text-gray-400">Room</p><p className="font-semibold text-blue-700">{na.room_assignment}</p></div>
+                <div><p className="text-gray-400">Bed</p><p className="font-semibold">{na.bed_assignment}</p></div>
+                <div><p className="text-gray-400">ESI</p><ESIBadge level={na.acuity_level} /></div>
+                <div><p className="text-gray-400">Specialist</p><p className="font-semibold text-orange-700">{na.specialist_consult_needed ?? "None"}</p></div>
+              </>
+            )}
             <div><p className="text-gray-400">Attending</p><p className="font-semibold">Dr. James Chen</p></div>
             <div><p className="text-gray-400">Auth</p><p className="font-semibold text-green-600">CPOE Verified</p></div>
             <div><p className="text-gray-400">Risk Level</p>
@@ -160,7 +180,7 @@ export default function DoctorCRM() {
                       </div>
                       <div className="min-w-0">
                         <p className="font-semibold text-gray-900 text-xs truncate">{e.patientContext?.name ?? "Unknown"}</p>
-                        <p className="text-gray-500 text-xs truncate">{e.structuredData?.chiefComplaint ?? "Processing…"}</p>
+                        <p className="text-gray-500 text-xs truncate">{e.structuredData?.chiefComplaint ?? "Processing..."}</p>
                         {(e.safetyFlags?.length??0)>0 && <p className="text-red-600 text-xs font-bold">⚠ {e.safetyFlags!.length} flags</p>}
                       </div>
                     </div>
@@ -193,11 +213,39 @@ export default function DoctorCRM() {
         <div className="flex-1 min-w-0 flex flex-col gap-3">
           {selected ? (
             <>
+              {/* Recommended Diagnosis — Prominent Banner */}
+              {selected.diagnosis && (
+                <div className={`rounded border-2 p-3 flex items-start gap-3 ${
+                  selected.diagnosis.confidence >= 0.8 ? "bg-blue-50 border-blue-300" :
+                  selected.diagnosis.confidence >= 0.6 ? "bg-amber-50 border-amber-300" : "bg-gray-50 border-gray-300"
+                }`}>
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center text-lg font-bold">Dx</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="text-xs text-gray-500 uppercase font-bold tracking-wide">Recommended Diagnosis</p>
+                      <span className="flex items-center gap-1 text-xs text-blue-600 font-medium">
+                        <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"/><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-blue-500"/></span>
+                        REAL-TIME
+                      </span>
+                    </div>
+                    <p className="text-lg font-bold text-gray-900">{selected.diagnosis.primary}</p>
+                    <p className="text-xs text-gray-500">ICD-10: {selected.diagnosis.icdCode}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 h-2 bg-gray-200 rounded-full max-w-xs">
+                        <div className={`h-2 rounded-full ${selected.diagnosis.confidence >= 0.8 ? "bg-blue-500" : selected.diagnosis.confidence >= 0.6 ? "bg-amber-500" : "bg-gray-400"}`} style={{width:`${selected.diagnosis.confidence*100}%`}}/>
+                      </div>
+                      <span className="text-xs font-bold">{(selected.diagnosis.confidence*100).toFixed(0)}% confidence</span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">{selected.diagnosis.reasoning}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Vitals */}
               <Panel title="Vital Signs">
                 <div className="px-3 py-2">
                   <div className="grid grid-cols-6 gap-2">
-                    {[["Heart Rate",v.heartRate,"bpm"],["Blood Pressure",v.bloodPressure,"mmHg"],["SpO₂",v.spO2,"%"],["Temp",v.temperature,"°F"],["Resp Rate",v.respiratoryRate,"/min"],["GCS",v.gcs,"/15"]].map(([l,val,u])=>(
+                    {([["Heart Rate",v.heartRate,"bpm"],["Blood Pressure",v.bloodPressure,"mmHg"],["SpO₂",v.spO2,"%"],["Temp",v.temperature,"°F"],["Resp Rate",v.respiratoryRate,"/min"],["GCS",v.gcs,"/15"]] as const).map(([l,val,u])=>(
                       <div key={String(l)} className={`border rounded p-2 text-center ${val?"border-gray-200":"border-dashed border-gray-200 opacity-40"}`}>
                         <p className="text-xs text-gray-400">{l}</p>
                         <p className="text-base font-bold text-gray-900">{val ?? "—"}</p>
@@ -208,22 +256,81 @@ export default function DoctorCRM() {
                 </div>
               </Panel>
 
-              {/* Diagnosis + History */}
+              {/* Nurse Handoff + Clinical Details */}
               <div className="flex gap-3 flex-1 min-h-0">
-                <Panel title="Clinical Assessment" className="flex-1">
+                {/* Nurse Handoff Panel */}
+                {na && (
+                  <Panel title="Nurse Handoff" badge={<ESIBadge level={na.acuity_level} />} className="flex-1">
+                    <div className="px-3 py-2 space-y-2.5 text-xs overflow-auto h-full">
+                      {/* SBAR Summary */}
+                      <div className="bg-blue-50 border border-blue-200 rounded p-2">
+                        <p className="text-blue-800 font-bold uppercase text-xs mb-1">SBAR Handoff</p>
+                        <p className="text-blue-900 leading-relaxed">{na.handoff_to_doctor}</p>
+                      </div>
+
+                      {/* Quick Stats */}
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="border rounded p-1.5 text-center">
+                          <p className="text-gray-400">Priority</p>
+                          <p className={`text-lg font-bold ${na.priority_rank <= 2 ? "text-red-600" : "text-orange-600"}`}>#{na.priority_rank}</p>
+                        </div>
+                        <div className="border rounded p-1.5 text-center">
+                          <p className="text-gray-400">Room</p>
+                          <p className="font-bold text-blue-700">{na.room_assignment}</p>
+                        </div>
+                        <div className="border rounded p-1.5 text-center">
+                          <p className="text-gray-400">Triage</p>
+                          <p className="font-bold text-gray-900">{na.triage_category}</p>
+                        </div>
+                      </div>
+
+                      {/* Alerts */}
+                      {(na.override_flag || na.isolation_required) && (
+                        <div className="flex gap-2">
+                          {na.override_flag && <div className="flex-1 bg-red-50 border border-red-200 rounded p-1.5 text-red-700 font-bold text-center">⚠ OVERRIDE FLAG</div>}
+                          {na.isolation_required && <div className="flex-1 bg-yellow-50 border border-yellow-200 rounded p-1.5 text-yellow-700 font-bold text-center">🔒 ISOLATION</div>}
+                        </div>
+                      )}
+
+                      {/* Nurse Observations */}
+                      <div>
+                        <p className="text-gray-400 uppercase font-medium mb-1">Nurse Observations</p>
+                        <p className="text-gray-700 bg-gray-50 border rounded p-1.5 leading-relaxed">{na.nurse_observations}</p>
+                      </div>
+
+                      {/* Consult + Tests */}
+                      {na.specialist_consult_needed && (
+                        <div className="bg-orange-50 border border-orange-200 rounded p-1.5">
+                          <p className="text-orange-700 font-bold">Consult: {na.specialist_consult_needed}</p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-gray-400 uppercase font-medium mb-1">Follow-Up Tests</p>
+                        <div className="flex flex-wrap gap-1">
+                          {na.follow_up_tests.map((t,i) => (
+                            <span key={i} className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">{t}</span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Equipment */}
+                      <div>
+                        <p className="text-gray-400 uppercase font-medium mb-1">Equipment</p>
+                        <div className="flex flex-wrap gap-1">
+                          {na.equipment_requested.map((eq,i) => (
+                            <span key={i} className="text-xs bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.5 rounded">{eq}</span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </Panel>
+                )}
+
+                {/* Clinical Assessment */}
+                <Panel title="Clinical Assessment" className={na ? "flex-1" : "flex-[2]"}>
                   <div className="px-3 py-2 space-y-3 text-xs overflow-auto h-full">
                     {selected.diagnosis && (
                       <>
-                        <div className="pb-2 border-b border-gray-100">
-                          <p className="text-gray-400">Primary Diagnosis</p>
-                          <p className="font-bold text-blue-700 text-sm mt-0.5">{selected.diagnosis.primary}</p>
-                          <p className="text-gray-400">ICD-10: {selected.diagnosis.icdCode} · {(selected.diagnosis.confidence*100).toFixed(0)}% confidence</p>
-                          <div className="h-1.5 bg-gray-200 rounded-full mt-1"><div className="h-1.5 bg-blue-500 rounded-full" style={{width:`${selected.diagnosis.confidence*100}%`}}/></div>
-                        </div>
-                        <div className="pb-2 border-b border-gray-100">
-                          <p className="text-gray-400 mb-1">Clinical Reasoning</p>
-                          <p className="text-gray-700 leading-relaxed">{selected.diagnosis.reasoning}</p>
-                        </div>
                         <div className="pb-2 border-b border-gray-100">
                           <p className="text-gray-400 mb-1">Differential Diagnoses</p>
                           <table className="w-full"><tbody>
@@ -248,8 +355,8 @@ export default function DoctorCRM() {
                 <div className="w-44 flex-shrink-0 flex flex-col gap-3">
                   <Panel title="Contact Info" className="flex-1">
                     <div className="px-3 py-2 space-y-2 text-xs">
-                      {[["Full Name",selected.patientContext?.name],["Patient ID",selected.patientContext?.patientId],["Age",`${selected.patientContext?.age}yo ${selected.patientContext?.sex}`],["Allergies",selected.patientContext?.allergies.join(", ")||"None"]].map(([l,v])=>(
-                        <div key={String(l)}><p className="text-gray-400">{l}</p><p className={`font-medium ${String(l)==="Allergies"&&v!=="None"?"text-red-700":"text-gray-800"}`}>{String(v)??""}</p></div>
+                      {([["Full Name",selected.patientContext?.name],["Patient ID",selected.patientContext?.patientId],["Age",`${selected.patientContext?.age}yo ${selected.patientContext?.sex}`],["Allergies",selected.patientContext?.allergies.join(", ")||"None"]] as const).map(([l,val])=>(
+                        <div key={String(l)}><p className="text-gray-400">{l}</p><p className={`font-medium ${String(l)==="Allergies"&&val!=="None"?"text-red-700":"text-gray-800"}`}>{String(val)??""}</p></div>
                       ))}
                       <div><p className="text-gray-400">Current Medications</p>
                         {selected.patientContext?.currentMedications.map(m=>(
@@ -259,13 +366,12 @@ export default function DoctorCRM() {
                     </div>
                   </Panel>
 
-                  {/* Surveys-style audit summary */}
                   <Panel title="Audit" className="flex-shrink-0">
                     <div className="px-3 py-2 text-xs space-y-1">
-                      {[["Field Input",selected.paramedicName],["Pipeline",`${selected.auditTrail.length} agents`],["Safety",`${selected.safetyFlags?.length??0} flags`],["Status",selected.status.replace(/_/g," ")]].map(([l,v])=>(
+                      {([["Field Input",selected.paramedicName],["Pipeline",`${selected.auditTrail.length} agents`],["Safety",`${selected.safetyFlags?.length??0} flags`],["Status",selected.status.replace(/_/g," ")]] as const).map(([l,val])=>(
                         <div key={String(l)} className="flex justify-between border-b border-gray-50 pb-1">
                           <span className="text-gray-400">{l}</span>
-                          <span className="font-medium text-gray-700">{String(v)}</span>
+                          <span className="font-medium text-gray-700">{String(val)}</span>
                         </div>
                       ))}
                       {selected.physicianName && <div className="flex justify-between"><span className="text-gray-400">Approved by</span><span className="font-medium text-green-700">{selected.physicianName}</span></div>}
@@ -294,9 +400,9 @@ export default function DoctorCRM() {
                       <span className={`ml-auto text-xs font-bold uppercase ${o.status==="blocked"?"text-red-700":o.status==="approved"?"text-green-700":"text-gray-500"}`}>{o.status}</span>
                     </div>
                     <p className="font-medium text-gray-900">{o.description}</p>
-                    {o.medication && <p className="text-gray-500 mt-0.5">{o.medication.dosage} · {o.medication.route}</p>}
+                    {o.medication && <p className="text-gray-500 mt-0.5">{o.medication.dosage} &middot; {o.medication.route}</p>}
                     {o.safetyNotes && <p className="text-red-600 mt-0.5 text-xs">{o.safetyNotes}</p>}
-                    {o.alternative && o.status==="blocked" && <p className="text-emerald-700 mt-0.5 font-medium">→ {o.alternative}</p>}
+                    {o.alternative && o.status==="blocked" && <p className="text-emerald-700 mt-0.5 font-medium">&rarr; {o.alternative}</p>}
                   </div>
                 ))}
               </div>
@@ -331,7 +437,7 @@ export default function DoctorCRM() {
               ) : selected ? (
                 <button onClick={handleApprove} disabled={approving}
                   className="w-full py-2.5 bg-[#2563a8] hover:bg-[#1e3f7a] text-white text-sm font-bold rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                  {approving ? <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Processing…</> : "✅ Approve & Commit to EHR"}
+                  {approving ? <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Processing...</> : "✅ Approve & Commit to EHR"}
                 </button>
               ) : <p className="text-xs text-gray-400 italic text-center">No feedback records found</p>}
             </div>

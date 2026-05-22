@@ -8,6 +8,7 @@ export type AgentRole =
   | "drug_allergy_check"
   | "safety_controller"
   | "case_supervisor"
+  | "nurse_assessment"
   | "identity_auth"
   | "ehr_write"
   | "audit";
@@ -90,6 +91,25 @@ export interface DiagnosisResult {
   reasoning: string;
 }
 
+export interface NurseAssessment {
+  intake_notes: string;
+  priority_rank: number;
+  room_assignment: string;
+  bed_assignment: string;
+  acuity_level: "ESI-1" | "ESI-2" | "ESI-3" | "ESI-4" | "ESI-5";
+  equipment_requested: string[];
+  triage_category: string;
+  estimated_wait_time: string;
+  follow_up_tests: string[];
+  specialist_consult_needed: string | null;
+  isolation_required: boolean;
+  nurse_observations: string;
+  patient_arrival_status: "ambulance" | "walk-in" | "transfer" | "helicopter";
+  family_notifications: string;
+  override_flag: boolean;
+  handoff_to_doctor: string;
+}
+
 export interface DraftOrder {
   id: string;
   type: "medication" | "procedure" | "imaging" | "lab" | "consult";
@@ -135,6 +155,9 @@ export interface Encounter {
   // Phase 4: Safety
   safetyFlags?: DrugConflict[];
   safetyRecommendation?: string;
+
+  // Nurse AI assessment
+  nurseAssessment?: NurseAssessment;
 
   // Nursing
   nursingNotes?: NursingNote[];
