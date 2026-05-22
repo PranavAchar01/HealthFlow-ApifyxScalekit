@@ -90,6 +90,19 @@ export interface DiagnosisResult {
   reasoning: string;
 }
 
+export interface GuidelineResult {
+  condition: string;
+  source: string;            // e.g. "AHA/ASA 2019 Stroke Guidelines"
+  recommendations: Array<{
+    text: string;
+    class: string;           // recommendation class, e.g. "Class I"
+    evidenceLevel: string;   // level of evidence, e.g. "Level A"
+  }>;
+  timeWindow?: string;       // e.g. "tPA within 4.5h of onset"
+  redFlags: string[];        // contraindication cues the planner/safety must heed
+  summary: string;
+}
+
 export interface DraftOrder {
   id: string;
   type: "medication" | "procedure" | "imaging" | "lab" | "consult";
@@ -128,6 +141,9 @@ export interface Encounter {
 
   // Phase 3: Diagnosis
   diagnosis?: DiagnosisResult;
+
+  // Phase 3: Evidence-based guidelines (Agent 7b)
+  guidelines?: GuidelineResult;
 
   // Phase 3: Orders
   draftOrders?: DraftOrder[];
