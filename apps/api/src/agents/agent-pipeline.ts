@@ -73,6 +73,7 @@ export async function runAgentPipeline(
     id: encounterId, status: "field_capture", acuity: "medium",
     createdAt: now, updatedAt: now,
     paramedicId, paramedicName, rawTranscript: rawText, auditTrail: [],
+    triageStatus: "pending", nursingNotes: [],
   };
 
   // Agent 1: Voice capture

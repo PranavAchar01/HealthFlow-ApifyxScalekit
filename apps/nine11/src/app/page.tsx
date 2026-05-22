@@ -139,7 +139,7 @@ export default function NineOneOne() {
   };
 
   const NURSE_URL = process.env.NEXT_PUBLIC_NURSE_URL ?? "https://nurse-seven.vercel.app";
-  const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://healthflow-doctor.vercel.app/crm";
+  const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://guestflow-doctor.vercel.app";
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">

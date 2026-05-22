@@ -25,6 +25,12 @@ create table if not exists encounters (
   safety_flags jsonb,
   safety_recommendation text,
 
+  -- Nursing
+  nursing_notes jsonb,
+  triage_status text,
+  nurse_id text,
+  nurse_name text,
+
   -- Approval
   approved_by text,
   approved_at timestamptz,
@@ -33,6 +39,12 @@ create table if not exists encounters (
   -- Audit
   audit_trail jsonb not null default '[]'::jsonb
 );
+
+-- Idempotent column adds for already-deployed databases
+alter table encounters add column if not exists nursing_notes jsonb;
+alter table encounters add column if not exists triage_status text;
+alter table encounters add column if not exists nurse_id text;
+alter table encounters add column if not exists nurse_name text;
 
 -- Enable Row Level Security
 alter table encounters enable row level security;

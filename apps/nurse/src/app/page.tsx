@@ -55,7 +55,7 @@ export default function NurseStation() {
   const riskColor = (acuity: string) =>
     acuity==="critical"?"bg-red-500":acuity==="high"?"bg-orange-500":acuity==="medium"?"bg-yellow-500":"bg-green-500";
 
-  const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://healthflow-doctor.vercel.app/crm";
+  const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://guestflow-doctor.vercel.app";
   const v = selected?.structuredData?.vitals ?? {};
 
   return (

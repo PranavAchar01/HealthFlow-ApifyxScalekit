@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   createAuditEntry("identity_auth", "AUTH_VALIDATE", `Paramedic token validated for ${token.name} (${token.userId}). Role: ${token.role}`, token.userId, token.name);
 
   const encounter = await runAgentPipeline(transcript, token.userId, token.name);
-  upsertEncounter(encounter);
+  await upsertEncounter(encounter);
 
   return NextResponse.json({
     success: true,

@@ -13,7 +13,7 @@ export async function OPTIONS(req: NextRequest) {
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const origin = req.headers.get("origin");
   const { id } = await params;
-  const encounter = getEncounter(id);
+  const encounter = await getEncounter(id);
   if (!encounter) {
     return NextResponse.json({ error: "Encounter not found" }, { status: 404, headers: corsHeaders(origin) });
   }
@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const { id } = await params;
-  const encounter = getEncounter(id);
+  const encounter = await getEncounter(id);
   if (!encounter) {
     return NextResponse.json({ error: "Encounter not found" }, { status: 404, headers: corsHeaders(origin) });
   }
@@ -80,6 +80,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     encounter.auditTrail.push(audit);
   }
 
-  upsertEncounter(encounter);
+  await upsertEncounter(encounter);
   return NextResponse.json({ encounter }, { headers: corsHeaders(origin) });
 }
