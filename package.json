@@ -10,12 +10,17 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.97.1",
+    "@langchain/anthropic": "^1.4.0",
+    "@langchain/community": "^1.1.28",
+    "@langchain/core": "^1.1.48",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.1",
+    "langchain": "^1.4.2",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "uuid": "^14.0.0"
+    "uuid": "^14.0.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

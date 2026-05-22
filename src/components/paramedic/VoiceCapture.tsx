@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 
 interface VoiceCaptureProps {
   onTranscriptSubmit: (transcript: string) => void;
@@ -8,63 +8,67 @@ interface VoiceCaptureProps {
 }
 
 export function VoiceCapture({ onTranscriptSubmit, isProcessing }: VoiceCaptureProps) {
-  const [isListening, setIsListening] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [transcript, setTranscript] = useState("");
-  const [interimText, setInterimText] = useState("");
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
 
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const audioBlob = new Blob(chunksRef.current, { type: "audio/webm" });
+        await transcribeAudio(audioBlob);
+      };
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
-      let interim = "";
-      let final = "";
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          final += result[0].transcript + " ";
-        } else {
-          interim += result[0].transcript;
-        }
-      }
-
-      if (final) {
-        setTranscript((prev) => prev + final);
-      }
-      setInterimText(interim);
-    };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognitionRef.current = recognition;
+      mediaRecorder.start(250);
+      setIsRecording(true);
+    } catch {
+      setTranscript((prev) => prev || "Microphone access denied. Please type your observations below.");
+    }
   }, []);
 
-  const toggleListening = useCallback(() => {
-    if (!recognitionRef.current) return;
-    if (isListening) {
-      recognitionRef.current.stop();
-    } else {
-      setTranscript("");
-      setInterimText("");
-      recognitionRef.current.start();
-      setIsListening(true);
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
     }
-  }, [isListening]);
+  }, [isRecording]);
+
+  const transcribeAudio = async (audioBlob: Blob) => {
+    setIsTranscribing(true);
+    try {
+      const formData = new FormData();
+      formData.append("audio", audioBlob, "recording.webm");
+
+      const res = await fetch("/api/voice/transcribe", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Transcription failed");
+
+      setTranscript((prev) => {
+        const separator = prev.trim() ? " " : "";
+        return prev + separator + data.text;
+      });
+    } catch (err) {
+      setTranscript((prev) => prev || `Transcription error: ${err instanceof Error ? err.message : "unknown"}`);
+    } finally {
+      setIsTranscribing(false);
+    }
+  };
 
   const handleSubmit = () => {
     if (transcript.trim()) {
@@ -72,21 +76,19 @@ export function VoiceCapture({ onTranscriptSubmit, isProcessing }: VoiceCaptureP
     }
   };
 
-  const hasSpeechAPI = typeof window !== "undefined" && (window.SpeechRecognition || window.webkitSpeechRecognition);
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <button
-          onClick={toggleListening}
-          disabled={isProcessing || !hasSpeechAPI}
+          onClick={isRecording ? stopRecording : startRecording}
+          disabled={isProcessing || isTranscribing}
           className={`flex items-center gap-2 px-6 py-3 rounded-full font-semibold text-white transition-all ${
-            isListening
+            isRecording
               ? "bg-red-500 hover:bg-red-600 animate-pulse"
               : "bg-blue-600 hover:bg-blue-700"
           } disabled:opacity-50 disabled:cursor-not-allowed`}
         >
-          {isListening ? (
+          {isRecording ? (
             <>
               <span className="relative flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
@@ -104,25 +106,30 @@ export function VoiceCapture({ onTranscriptSubmit, isProcessing }: VoiceCaptureP
           )}
         </button>
 
-        {!hasSpeechAPI && (
-          <p className="text-sm text-amber-600">
-            Speech API not available. Use text input below.
-          </p>
+        {isTranscribing && (
+          <div className="flex items-center gap-2 text-sm text-blue-600">
+            <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Transcribing with ElevenLabs...
+          </div>
         )}
+
+        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">
+          Powered by ElevenLabs Scribe
+        </span>
       </div>
 
       <div className="relative">
         <textarea
-          value={transcript + interimText}
-          onChange={(e) => {
-            setTranscript(e.target.value);
-            setInterimText("");
-          }}
-          placeholder="Dictate or type patient vitals and observations...&#10;&#10;Example: 68 year old male, suspected stroke, left-side paralysis, onset 20 minutes ago. Heart rate 92, blood pressure 168/94, SpO2 96%, GCS 13. Patient is alert but confused with facial droop and slurred speech."
+          value={transcript}
+          onChange={(e) => setTranscript(e.target.value)}
+          placeholder={"Dictate or type patient vitals and observations...\n\nExample: 68 year old male, suspected stroke, left-side paralysis, onset 20 minutes ago. Heart rate 92, blood pressure 168/94, SpO2 96%, GCS 13. Patient is alert but confused with facial droop and slurred speech."}
           rows={8}
           className="w-full rounded-lg border-2 border-gray-200 p-4 text-sm font-mono focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors resize-none"
         />
-        {isListening && (
+        {isRecording && (
           <div className="absolute top-2 right-2">
             <span className="flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
@@ -138,7 +145,7 @@ export function VoiceCapture({ onTranscriptSubmit, isProcessing }: VoiceCaptureP
         </p>
         <button
           onClick={handleSubmit}
-          disabled={!transcript.trim() || isProcessing}
+          disabled={!transcript.trim() || isProcessing || isTranscribing}
           className="px-6 py-2.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {isProcessing ? (
