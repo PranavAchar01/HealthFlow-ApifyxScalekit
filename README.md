@@ -98,6 +98,15 @@ Copy `.env.example` to `.env.local`. All integrations are optional -- the app wo
 
 For production with Supabase, run `supabase/schema.sql`.
 
+## Documentation
+
+| Doc | Description |
+|-----|-------------|
+| [docs/HANDOFF.md](docs/HANDOFF.md) | Full engineering handoff — architecture, API reference, data model, known limitations, next steps |
+| [docs/AGENT-GUIDE.md](docs/AGENT-GUIDE.md) | Per-agent breakdown — inputs/outputs, LangChain chains, extension points, real-integration code samples |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Vercel deploy, env vars, Supabase setup, Scalekit auth, local dev, build checklist |
+| [docs/CRM-ARCHITECTURE.md](docs/CRM-ARCHITECTURE.md) | 5-view CRM topology, per-view audience and features, data flow, extension guide |
+
 ## Project Structure
 
 ```
