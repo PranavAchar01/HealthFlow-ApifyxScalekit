@@ -1,4 +1,4 @@
-import type { Encounter } from "@guestflow/types";
+import type { Encounter } from "@/types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 const DOCTOR_TOKEN = "dr_chen";

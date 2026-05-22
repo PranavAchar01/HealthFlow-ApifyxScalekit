@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { Encounter } from "@guestflow/types";
+import type { Encounter } from "@/types";
 import { EncounterCard } from "@/components/crm/EncounterCard";
 import { EncounterDetail } from "@/components/crm/EncounterDetail";
 import { getEncounters, commitEncounter } from "@/lib/api";

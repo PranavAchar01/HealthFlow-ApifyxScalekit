@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Encounter, AuditEntry } from "@guestflow/types";
+import { Encounter, AuditEntry } from "@/types";
 import { AgentTimeline } from "@/components/ui/AgentTimeline";
 
 export default function AuditCRM() {

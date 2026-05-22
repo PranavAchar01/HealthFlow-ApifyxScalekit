@@ -1,6 +1,6 @@
 "use client";
 
-import { EncounterStatus, AcuityLevel } from "@guestflow/types";
+import { EncounterStatus, AcuityLevel } from "@/types";
 
 const STATUS_STYLES: Record<EncounterStatus, { bg: string; text: string; label: string }> = {
   field_capture: { bg: "bg-blue-100", text: "text-blue-800", label: "Field Capture" },

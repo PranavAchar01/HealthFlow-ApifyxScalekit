@@ -1,6 +1,6 @@
 "use client";
 
-import { Encounter } from "@guestflow/types";
+import { Encounter } from "@/types";
 import { StatusBadge, AcuityBadge } from "@/components/ui/StatusBadge";
 import { AgentTimeline } from "@/components/ui/AgentTimeline";
 import { useState } from "react";

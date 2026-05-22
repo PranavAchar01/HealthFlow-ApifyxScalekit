@@ -1,6 +1,6 @@
 "use client";
 
-import { AuditEntry } from "@guestflow/types";
+import { AuditEntry } from "@/types";
 
 const AGENT_ICONS: Record<string, string> = {
   voice_capture: "🎙️",

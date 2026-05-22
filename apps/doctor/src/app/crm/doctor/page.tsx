@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Encounter } from "@guestflow/types";
+import { Encounter } from "@/types";
 import { StatusBadge, AcuityBadge } from "@/components/ui/StatusBadge";
 import { EncounterDetail } from "@/components/crm/EncounterDetail";
 
