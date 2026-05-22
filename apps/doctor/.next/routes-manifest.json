@@ -26,36 +26,6 @@
       "regex": "^/_not\\-found(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/_not\\-found(?:/)?$"
-    },
-    {
-      "page": "/crm",
-      "regex": "^/crm(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/crm(?:/)?$"
-    },
-    {
-      "page": "/crm/admin",
-      "regex": "^/crm/admin(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/crm/admin(?:/)?$"
-    },
-    {
-      "page": "/crm/audit",
-      "regex": "^/crm/audit(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/crm/audit(?:/)?$"
-    },
-    {
-      "page": "/crm/doctor",
-      "regex": "^/crm/doctor(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/crm/doctor(?:/)?$"
-    },
-    {
-      "page": "/crm/field",
-      "regex": "^/crm/field(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/crm/field(?:/)?$"
     }
   ],
   "dataRoutes": [],

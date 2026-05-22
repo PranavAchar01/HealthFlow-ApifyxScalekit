@@ -306,6 +306,6 @@
     ".next/server/next-font-manifest.json"
   ],
   "ignore": [
-    "node_modules/next/dist/compiled/@ampproject/toolbox-optimizer/**/*"
+    "../../node_modules/next/dist/compiled/@ampproject/toolbox-optimizer/**/*"
   ]
 }

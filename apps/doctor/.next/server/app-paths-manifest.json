@@ -1,9 +1,4 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/page": "app/page.js",
-  "/crm/admin/page": "app/crm/admin/page.js",
-  "/crm/audit/page": "app/crm/audit/page.js",
-  "/crm/page": "app/crm/page.js",
-  "/crm/doctor/page": "app/crm/doctor/page.js",
-  "/crm/field/page": "app/crm/field/page.js"
+  "/page": "app/page.js"
 }

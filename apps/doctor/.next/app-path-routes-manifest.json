@@ -1,9 +1,4 @@
 {
   "/_not-found/page": "/_not-found",
-  "/page": "/",
-  "/crm/admin/page": "/crm/admin",
-  "/crm/audit/page": "/crm/audit",
-  "/crm/page": "/crm",
-  "/crm/doctor/page": "/crm/doctor",
-  "/crm/field/page": "/crm/field"
+  "/page": "/"
 }
