@@ -1,5 +1,4 @@
 {
-  "/_global-error/page": "app/_global-error/page.js",
   "/_not-found/page": "app/_not-found/page.js",
   "/api/agents/commit/route": "app/api/agents/commit/route.js",
   "/api/agents/draft/route": "app/api/agents/draft/route.js",

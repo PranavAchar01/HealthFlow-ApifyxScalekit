@@ -1,16 +1,7 @@
 {
   "headers": {
-    "x-nextjs-stale-time": "300",
+    "x-nextjs-stale-time": "4294967294",
     "x-nextjs-prerender": "1",
     "x-next-cache-tags": "_N_T_/layout,_N_T_/crm/layout,_N_T_/crm/audit/layout,_N_T_/crm/audit/page,_N_T_/crm/audit"
-  },
-  "segmentPaths": [
-    "/_tree",
-    "/_full",
-    "/crm/audit/__PAGE__",
-    "/crm/audit",
-    "/crm",
-    "/_index",
-    "/_head"
-  ]
+  }
 }

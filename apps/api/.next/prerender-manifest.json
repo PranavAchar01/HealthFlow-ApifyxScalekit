@@ -5,7 +5,7 @@
       "experimentalBypassFor": [
         {
           "type": "header",
-          "key": "next-action"
+          "key": "Next-Action"
         },
         {
           "type": "header",
@@ -25,55 +25,6 @@
         "x-next-revalidate-tag-token"
       ]
     },
-    "/_global-error": {
-      "experimentalBypassFor": [
-        {
-          "type": "header",
-          "key": "next-action"
-        },
-        {
-          "type": "header",
-          "key": "content-type",
-          "value": "multipart/form-data;.*"
-        }
-      ],
-      "initialRevalidateSeconds": false,
-      "srcRoute": "/_global-error",
-      "dataRoute": "/_global-error.rsc",
-      "allowHeader": [
-        "host",
-        "x-matched-path",
-        "x-prerender-revalidate",
-        "x-prerender-revalidate-if-generated",
-        "x-next-revalidated-tags",
-        "x-next-revalidate-tag-token"
-      ]
-    },
-    "/_not-found": {
-      "initialStatus": 404,
-      "experimentalBypassFor": [
-        {
-          "type": "header",
-          "key": "next-action"
-        },
-        {
-          "type": "header",
-          "key": "content-type",
-          "value": "multipart/form-data;.*"
-        }
-      ],
-      "initialRevalidateSeconds": false,
-      "srcRoute": "/_not-found",
-      "dataRoute": "/_not-found.rsc",
-      "allowHeader": [
-        "host",
-        "x-matched-path",
-        "x-prerender-revalidate",
-        "x-prerender-revalidate-if-generated",
-        "x-next-revalidated-tags",
-        "x-next-revalidate-tag-token"
-      ]
-    },
     "/favicon.ico": {
       "initialHeaders": {
         "cache-control": "public, max-age=0, must-revalidate",
@@ -83,7 +34,7 @@
       "experimentalBypassFor": [
         {
           "type": "header",
-          "key": "next-action"
+          "key": "Next-Action"
         },
         {
           "type": "header",
@@ -107,8 +58,8 @@
   "dynamicRoutes": {},
   "notFoundRoutes": [],
   "preview": {
-    "previewModeId": "c3ef075eb1bdbed5eff07cac83d38218",
-    "previewModeSigningKey": "d3431ad2daeddd54e4930a87ac3d35e6954e75410e4b082f10ed9f269c133c7d",
-    "previewModeEncryptionKey": "aa9dbaf9867c2cf123c49074e7c722be87663d4e756a31a11ec3757047df0426"
+    "previewModeId": "c1c9af2fba1b2ed7fb13c9daf517387c",
+    "previewModeSigningKey": "3f9e24f722f106c3a88ee1595279e226e6bc29e35450f430bf8268bce332cf4d",
+    "previewModeEncryptionKey": "f204479cfc3e0ab4a9455b482e338104894451055c7e005362811cd73662161f"
   }
 }

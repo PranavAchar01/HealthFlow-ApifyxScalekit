@@ -1,7 +1,6 @@
 {
   "version": 3,
   "pages404": true,
-  "appType": "app",
   "caseSensitive": false,
   "basePath": "",
   "redirects": [
@@ -9,18 +8,11 @@
       "source": "/:path+/",
       "destination": "/:path+",
       "internal": true,
-      "priority": true,
       "statusCode": 308,
       "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
     }
   ],
   "headers": [],
-  "onMatchHeaders": [],
-  "rewrites": {
-    "beforeFiles": [],
-    "afterFiles": [],
-    "fallback": []
-  },
   "dynamicRoutes": [
     {
       "page": "/api/encounters/[id]",
@@ -39,46 +31,10 @@
       "namedRegex": "^/(?:/)?$"
     },
     {
-      "page": "/_global-error",
-      "regex": "^/_global\\-error(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/_global\\-error(?:/)?$"
-    },
-    {
       "page": "/_not-found",
       "regex": "^/_not\\-found(?:/)?$",
       "routeKeys": {},
       "namedRegex": "^/_not\\-found(?:/)?$"
-    },
-    {
-      "page": "/api/agents/commit",
-      "regex": "^/api/agents/commit(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/api/agents/commit(?:/)?$"
-    },
-    {
-      "page": "/api/agents/draft",
-      "regex": "^/api/agents/draft(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/api/agents/draft(?:/)?$"
-    },
-    {
-      "page": "/api/auth/users",
-      "regex": "^/api/auth/users(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/api/auth/users(?:/)?$"
-    },
-    {
-      "page": "/api/encounters",
-      "regex": "^/api/encounters(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/api/encounters(?:/)?$"
-    },
-    {
-      "page": "/api/voice/transcribe",
-      "regex": "^/api/voice/transcribe(?:/)?$",
-      "routeKeys": {},
-      "namedRegex": "^/api/voice/transcribe(?:/)?$"
     },
     {
       "page": "/favicon.ico",
@@ -89,20 +45,20 @@
   ],
   "dataRoutes": [],
   "rsc": {
-    "header": "rsc",
-    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
-    "prefetchHeader": "next-router-prefetch",
+    "header": "RSC",
+    "varyHeader": "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch",
+    "prefetchHeader": "Next-Router-Prefetch",
     "didPostponeHeader": "x-nextjs-postponed",
     "contentTypeHeader": "text/x-component",
     "suffix": ".rsc",
-    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSuffix": ".prefetch.rsc",
+    "prefetchSegmentHeader": "Next-Router-Segment-Prefetch",
     "prefetchSegmentSuffix": ".segment.rsc",
-    "prefetchSegmentDirSuffix": ".segments",
-    "clientParamParsing": false,
-    "dynamicRSCPrerender": false
+    "prefetchSegmentDirSuffix": ".segments"
   },
   "rewriteHeaders": {
     "pathHeader": "x-nextjs-rewritten-path",
     "queryHeader": "x-nextjs-rewritten-query"
-  }
+  },
+  "rewrites": []
 }

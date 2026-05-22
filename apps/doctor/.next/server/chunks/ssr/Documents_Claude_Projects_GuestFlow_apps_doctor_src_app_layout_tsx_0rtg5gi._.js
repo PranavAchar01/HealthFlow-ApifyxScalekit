@@ -1,3 +1,0 @@
-module.exports=[73923,a=>{"use strict";var b=a.i(63724);a.s(["default",0,function({children:a}){return(0,b.jsx)("html",{lang:"en",className:"h-full",children:(0,b.jsx)("body",{className:"min-h-full bg-gray-50",children:a})})},"metadata",0,{title:"GuestFlow Doctor CRM",description:"Physician clinical review and order approval dashboard"}])},44749,a=>{a.n(a.i(73923))}];
-
-//# sourceMappingURL=Documents_Claude_Projects_GuestFlow_apps_doctor_src_app_layout_tsx_0rtg5gi._.js.map

@@ -1,10 +1,9 @@
 {
-  "/_global-error/page": "/_global-error",
   "/_not-found/page": "/_not-found",
-  "/crm/admin/page": "/crm/admin",
-  "/crm/audit/page": "/crm/audit",
+  "/page": "/",
   "/crm/doctor/page": "/crm/doctor",
+  "/crm/audit/page": "/crm/audit",
   "/crm/field/page": "/crm/field",
-  "/crm/page": "/crm",
-  "/page": "/"
+  "/crm/admin/page": "/crm/admin",
+  "/crm/page": "/crm"
 }
