@@ -23,7 +23,8 @@ Consider the full clinical picture. Orders should be evidence-based and appropri
     `Diagnosis: {diagnosis} (confidence: {confidence})
 Chief Complaint: {chiefComplaint}
 Patient: {age}yo {sex}, Medications: {medications}
-Differentials: {differentials}`,
+Differentials: {differentials}
+Evidence-based guidelines to follow: {guidelines}`,
   ],
 ]);
 
@@ -87,6 +88,9 @@ export async function runActionPlannerChain(encounter: Encounter): Promise<Draft
       sex: encounter.patientContext?.sex ?? "unknown",
       medications: encounter.patientContext?.currentMedications.join(", ") ?? "unknown",
       differentials: JSON.stringify(encounter.diagnosis.differentials),
+      guidelines: encounter.guidelines
+        ? `${encounter.guidelines.source}: ${encounter.guidelines.recommendations.map((r) => r.text).join("; ")}. Red flags: ${encounter.guidelines.redFlags.join("; ")}`
+        : "none available",
     });
 
     const jsonMatch = result.match(/\[[\s\S]*\]/);
