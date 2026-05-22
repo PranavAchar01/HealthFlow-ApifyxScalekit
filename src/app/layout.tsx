@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "GuestFlow — Multi-Agent Healthcare AI",
+  title: "HealthFlow — Multi-Agent Healthcare AI",
   description: "9-agent pipeline: field voice capture to EHR commit in 60 seconds with AI diagnostics, drug safety checks, and immutable audit.",
 };
 

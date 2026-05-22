@@ -55,7 +55,7 @@ export default function NurseStation() {
   const riskColor = (acuity: string) =>
     acuity==="critical"?"bg-red-500":acuity==="high"?"bg-orange-500":acuity==="medium"?"bg-yellow-500":"bg-green-500";
 
-  const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://guestflow-doctor.vercel.app/crm";
+  const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://healthflow-doctor.vercel.app/crm";
   const v = selected?.structuredData?.vitals ?? {};
 
   return (
@@ -66,7 +66,7 @@ export default function NurseStation() {
           {Array.from({length:9}).map((_,i)=><div key={i} className="w-1.5 h-1.5 bg-white rounded-sm opacity-80"/>)}
         </div>
         <div className="flex items-center gap-1 text-sm">
-          <span className="opacity-60">GuestFlow</span><span className="opacity-30 mx-1">›</span>
+          <span className="opacity-60">HealthFlow</span><span className="opacity-30 mx-1">›</span>
           <span className="opacity-60">Nursing</span><span className="opacity-30 mx-1">›</span>
           <span className="font-semibold">Maria Rodriguez, RN — Bay 3</span>
         </div>

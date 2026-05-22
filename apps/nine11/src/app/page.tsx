@@ -139,7 +139,7 @@ export default function NineOneOne() {
   };
 
   const NURSE_URL = process.env.NEXT_PUBLIC_NURSE_URL ?? "https://nurse-seven.vercel.app";
-  const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://guestflow-doctor.vercel.app/crm";
+  const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://healthflow-doctor.vercel.app/crm";
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-100">
@@ -149,7 +149,7 @@ export default function NineOneOne() {
           {Array.from({length:9}).map((_,i)=><div key={i} className="w-1.5 h-1.5 bg-white rounded-sm opacity-80"/>)}
         </div>
         <div className="flex items-center gap-1 text-sm">
-          <span className="opacity-70">GuestFlow</span>
+          <span className="opacity-70">HealthFlow</span>
           <span className="opacity-40 mx-1">›</span>
           <span className="opacity-70">Emergency</span>
           <span className="opacity-40 mx-1">›</span>
@@ -373,7 +373,7 @@ export default function NineOneOne() {
                           className="block w-full text-center py-2 text-xs font-semibold bg-[#2563a8] text-white rounded hover:bg-[#1e3f7a] transition-colors">
                           👨‍⚕️ Doctor CRM
                         </a>
-                        <a href={`https://guestflow-paramedic.vercel.app`} target="_blank" rel="noopener noreferrer"
+                        <a href={`https://healthflow-paramedic.vercel.app`} target="_blank" rel="noopener noreferrer"
                           className="block w-full text-center py-2 text-xs font-semibold border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors">
                           🚑 Paramedic View
                         </a>

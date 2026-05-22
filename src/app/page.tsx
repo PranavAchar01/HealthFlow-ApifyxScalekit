@@ -8,9 +8,9 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-emerald-500 flex items-center justify-center text-white font-bold text-lg">
-              GF
+              HF
             </div>
-            <span className="text-white font-bold text-xl">GuestFlow</span>
+            <span className="text-white font-bold text-xl">HealthFlow</span>
           </div>
           <div className="flex items-center gap-4">
             <Link
@@ -146,7 +146,7 @@ export default function Home() {
       <footer className="border-t border-white/10 py-8">
         <div className="max-w-6xl mx-auto px-6 text-center">
           <p className="text-gray-500 text-sm">
-            GuestFlow — Multi-Agent Healthcare AI Pipeline
+            HealthFlow — Multi-Agent Healthcare AI Pipeline
           </p>
         </div>
       </footer>

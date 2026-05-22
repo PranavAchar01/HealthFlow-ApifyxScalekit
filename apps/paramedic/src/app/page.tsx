@@ -18,7 +18,7 @@ function TopNav({ subtitle }: { subtitle: string }) {
         {Array.from({length:9}).map((_,i)=><div key={i} className="w-1.5 h-1.5 bg-white rounded-sm opacity-80"/>)}
       </div>
       <div className="flex items-center gap-1 text-sm">
-        <span className="opacity-60">GuestFlow</span><span className="opacity-30 mx-1">›</span>
+        <span className="opacity-60">HealthFlow</span><span className="opacity-30 mx-1">›</span>
         <span className="opacity-60">Field</span><span className="opacity-30 mx-1">›</span>
         <span className="font-semibold">{subtitle}</span>
       </div>
@@ -114,7 +114,7 @@ export default function ParamedicApp() {
 
   const words = transcript.split(/\s+/).filter(Boolean).length;
   const NURSE_URL = process.env.NEXT_PUBLIC_NURSE_URL ?? "https://nurse-seven.vercel.app";
-  const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://guestflow-doctor.vercel.app/crm";
+  const DOCTOR_URL = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL ?? "https://healthflow-doctor.vercel.app/crm";
 
   return (
     <div className="h-screen flex flex-col bg-gray-100 overflow-hidden" style={{fontFamily:"'Segoe UI',system-ui,sans-serif",fontSize:"13px"}}>

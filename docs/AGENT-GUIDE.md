@@ -1,4 +1,4 @@
-# GuestFlow Agent Guide
+# HealthFlow Agent Guide
 
 This document describes each agent in the pipeline, its inputs/outputs, LangChain integration, and how to extend or replace it.
 

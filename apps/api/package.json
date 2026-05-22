@@ -1,5 +1,5 @@
 {
-  "name": "@guestflow/api",
+  "name": "@healthflow/api",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -11,6 +11,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.97.1",
     "@langchain/anthropic": "^1.4.0",
+    "@langchain/google-genai": "^0.0.21",
     "@langchain/community": "^1.1.28",
     "@langchain/core": "^1.1.48",
     "@supabase/ssr": "^0.10.3",

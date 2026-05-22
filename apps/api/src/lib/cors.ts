@@ -3,8 +3,10 @@ import { NextResponse } from "next/server";
 const ALLOWED_ORIGINS = [
   "http://localhost:3002",
   "http://localhost:3003",
+  "http://localhost:3005",
   process.env.PARAMEDIC_APP_URL,
   process.env.DOCTOR_APP_URL,
+  process.env.NINE11_APP_URL,
 ].filter(Boolean) as string[];
 
 export function corsHeaders(origin: string | null) {

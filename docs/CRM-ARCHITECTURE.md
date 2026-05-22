@@ -1,4 +1,4 @@
-# GuestFlow CRM Architecture
+# HealthFlow CRM Architecture
 
 The CRM is split into five independent but interconnected views, all sharing a common layout, navigation, and data layer via the `/api/encounters` endpoint.
 
