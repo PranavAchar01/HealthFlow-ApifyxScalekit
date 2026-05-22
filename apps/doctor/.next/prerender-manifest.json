@@ -1,7 +1,7 @@
 {
   "version": 4,
   "routes": {
-    "/crm/field": {
+    "/crm/audit": {
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -14,56 +14,8 @@
         }
       ],
       "initialRevalidateSeconds": false,
-      "srcRoute": "/crm/field",
-      "dataRoute": "/crm/field.rsc",
-      "allowHeader": [
-        "host",
-        "x-matched-path",
-        "x-prerender-revalidate",
-        "x-prerender-revalidate-if-generated",
-        "x-next-revalidated-tags",
-        "x-next-revalidate-tag-token"
-      ]
-    },
-    "/crm/doctor": {
-      "experimentalBypassFor": [
-        {
-          "type": "header",
-          "key": "Next-Action"
-        },
-        {
-          "type": "header",
-          "key": "content-type",
-          "value": "multipart/form-data;.*"
-        }
-      ],
-      "initialRevalidateSeconds": false,
-      "srcRoute": "/crm/doctor",
-      "dataRoute": "/crm/doctor.rsc",
-      "allowHeader": [
-        "host",
-        "x-matched-path",
-        "x-prerender-revalidate",
-        "x-prerender-revalidate-if-generated",
-        "x-next-revalidated-tags",
-        "x-next-revalidate-tag-token"
-      ]
-    },
-    "/crm": {
-      "experimentalBypassFor": [
-        {
-          "type": "header",
-          "key": "Next-Action"
-        },
-        {
-          "type": "header",
-          "key": "content-type",
-          "value": "multipart/form-data;.*"
-        }
-      ],
-      "initialRevalidateSeconds": false,
-      "srcRoute": "/crm",
-      "dataRoute": "/crm.rsc",
+      "srcRoute": "/crm/audit",
+      "dataRoute": "/crm/audit.rsc",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -97,7 +49,7 @@
         "x-next-revalidate-tag-token"
       ]
     },
-    "/crm/audit": {
+    "/crm/doctor": {
       "experimentalBypassFor": [
         {
           "type": "header",
@@ -110,8 +62,8 @@
         }
       ],
       "initialRevalidateSeconds": false,
-      "srcRoute": "/crm/audit",
-      "dataRoute": "/crm/audit.rsc",
+      "srcRoute": "/crm/doctor",
+      "dataRoute": "/crm/doctor.rsc",
       "allowHeader": [
         "host",
         "x-matched-path",
@@ -144,13 +96,61 @@
         "x-next-revalidated-tags",
         "x-next-revalidate-tag-token"
       ]
+    },
+    "/crm/field": {
+      "experimentalBypassFor": [
+        {
+          "type": "header",
+          "key": "Next-Action"
+        },
+        {
+          "type": "header",
+          "key": "content-type",
+          "value": "multipart/form-data;.*"
+        }
+      ],
+      "initialRevalidateSeconds": false,
+      "srcRoute": "/crm/field",
+      "dataRoute": "/crm/field.rsc",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
+    },
+    "/crm": {
+      "experimentalBypassFor": [
+        {
+          "type": "header",
+          "key": "Next-Action"
+        },
+        {
+          "type": "header",
+          "key": "content-type",
+          "value": "multipart/form-data;.*"
+        }
+      ],
+      "initialRevalidateSeconds": false,
+      "srcRoute": "/crm",
+      "dataRoute": "/crm.rsc",
+      "allowHeader": [
+        "host",
+        "x-matched-path",
+        "x-prerender-revalidate",
+        "x-prerender-revalidate-if-generated",
+        "x-next-revalidated-tags",
+        "x-next-revalidate-tag-token"
+      ]
     }
   },
   "dynamicRoutes": {},
   "notFoundRoutes": [],
   "preview": {
-    "previewModeId": "3c483201797f41f2aec995a05c792dc1",
-    "previewModeSigningKey": "0f1b8fec01c06d6ec9021d813623bb91450540be787fba7a1ec18d159866e59a",
-    "previewModeEncryptionKey": "440ced17245029b845e65f14b456c2560d28363e97151867bbf892af29f1a166"
+    "previewModeId": "e5ab8987d5a451056c1688662b4cbcd6",
+    "previewModeSigningKey": "5e24bcc4a0734b0090812c89d8dcd94bf55076ede1371ff70f46585146f25cdd",
+    "previewModeEncryptionKey": "f00939c4d78004a5b6aadeea3eb0a1d91cf641af2f9d65043300d8310c76298f"
   }
 }

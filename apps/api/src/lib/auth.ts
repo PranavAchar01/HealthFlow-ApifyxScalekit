@@ -17,6 +17,14 @@ const DEMO_USERS: Record<string, AuthToken> = {
     issuedAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
   },
+  nurse_rodriguez: {
+    userId: "rn-001",
+    name: "Maria Rodriguez, RN",
+    role: "nurse",
+    permissions: ["view_encounters", "nursing_notes", "triage", "escalate"],
+    issuedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+  },
   admin_ops: {
     userId: "admin-001",
     name: "Admin Operations",
