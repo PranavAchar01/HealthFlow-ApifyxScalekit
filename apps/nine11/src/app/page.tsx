@@ -50,7 +50,7 @@ const SCENARIOS = [
     email: "m.johnson@email.com",
     language: "English",
     risk: "MED",
-    chiefComplaint: "Blunt Trauma — MVA",
+    chiefComplaint: "Blunt Trauma - MVA",
     conditions: [],
     medications: [],
     allergies: [],
@@ -149,21 +149,21 @@ export default function NineOneOne() {
           {Array.from({length:9}).map((_,i)=><div key={i} className="w-1.5 h-1.5 bg-white rounded-sm opacity-80"/>)}
         </div>
         <div className="flex items-center gap-1 text-sm">
-          <span className="opacity-70">GuestFlow</span>
+          <span className="opacity-70">HealthFlow</span>
           <span className="opacity-40 mx-1">›</span>
           <span className="opacity-70">Emergency</span>
           <span className="opacity-40 mx-1">›</span>
           <span className="font-semibold">911 Dispatch</span>
         </div>
         <div className="ml-auto flex items-center gap-3 text-sm opacity-80">
-          <span>🔍</span><span>🕐</span><span>⚙</span>
+          <span>Search</span><span>History</span><span>Settings</span>
           <div className="w-7 h-7 rounded-full bg-orange-500 flex items-center justify-center text-xs font-bold">D</div>
         </div>
       </nav>
 
       {/* Action Bar */}
       <div className="bg-[#2563a8] text-white flex items-center h-9 px-4 gap-1 flex-shrink-0">
-        {["🚨 NEW INCIDENT","📋 PATIENT HISTORY","🖨 PRINT REPORT","🔄 REFRESH"].map(btn=>(
+        {["Zoom In","Zoom Out"].map(btn=>(
           <button key={btn} className="flex items-center gap-1.5 text-xs font-medium px-3 h-7 rounded border border-white/20 hover:bg-white/10 transition-colors">
             {btn}
           </button>
@@ -220,7 +220,6 @@ export default function NineOneOne() {
                     <p className="text-sm text-gray-500 mt-0.5">{selected.chiefComplaint}</p>
                   </div>
                   <div className="flex gap-6 text-sm flex-shrink-0">
-                    <div><p className="text-gray-400 text-xs">Preferred Contact</p><p className="font-medium">Secure Message</p></div>
                     <div><p className="text-gray-400 text-xs">Language</p><p className="font-medium">{selected.language}</p></div>
                     <div><p className="text-gray-400 text-xs">Risk Level</p>
                       <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold text-white ${
@@ -311,7 +310,7 @@ export default function NineOneOne() {
                       >
                         {loading ? (
                           <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Running Pipeline...</>
-                        ) : "🚨 Launch Emergency Pipeline"}
+                        ) : "Launch Emergency Pipeline"}
                       </button>
                     </div>
                   </div>
@@ -367,15 +366,15 @@ export default function NineOneOne() {
                       <div className="px-3 py-2 space-y-2">
                         <a href={NURSE_URL} target="_blank" rel="noopener noreferrer"
                           className="block w-full text-center py-2 text-xs font-semibold bg-teal-600 text-white rounded hover:bg-teal-700 transition-colors">
-                          🏥 Nurse Station
+                          Nurse Station
                         </a>
                         <a href={DOCTOR_URL} target="_blank" rel="noopener noreferrer"
                           className="block w-full text-center py-2 text-xs font-semibold bg-[#2563a8] text-white rounded hover:bg-[#1e3f7a] transition-colors">
-                          👨‍⚕️ Doctor CRM
+                          Doctor CRM
                         </a>
                         <a href={`https://guestflow-paramedic.vercel.app`} target="_blank" rel="noopener noreferrer"
                           className="block w-full text-center py-2 text-xs font-semibold border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors">
-                          🚑 Paramedic View
+                          Paramedic View
                         </a>
                       </div>
                     </div>
@@ -392,7 +391,6 @@ export default function NineOneOne() {
           ) : (
             <div className="flex-1 bg-white border border-gray-200 rounded flex items-center justify-center">
               <div className="text-center">
-                <div className="text-5xl mb-4">🚨</div>
                 <p className="text-gray-400 font-medium">Select a patient scenario</p>
                 <p className="text-gray-300 text-xs mt-1">Choose from the preset emergency cases on the left</p>
               </div>
