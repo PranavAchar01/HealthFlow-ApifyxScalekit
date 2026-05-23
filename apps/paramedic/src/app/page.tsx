@@ -68,7 +68,6 @@ function Panel({ title, children, className="" }: { title: string; children: Rea
 }
 
 const AUTH = { "Content-Type": "application/json", Authorization: "Bearer paramedic_sarah" };
-const CHUNK_MS = 3500; // how often we cut an audio chunk to transcribe + push live
 
 const resultFromLive = (e: LiveEncounter): Result => ({
   encounterId: e.id, status: e.status, acuity: e.acuity,
@@ -82,15 +81,13 @@ const resultFromLive = (e: LiveEncounter): Result => ({
 
 export default function ParamedicApp() {
   const [isRecording, setIsRecording] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [liveEncounters, setLiveEncounters] = useState<LiveEncounter[]>([]);
 
-  const mrRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const srRef = useRef<SpeechRecognition | null>(null);
   const recordingRef = useRef(false);
   const transcriptRef = useRef("");
   const pushingRef = useRef(false);
@@ -197,58 +194,41 @@ export default function ParamedicApp() {
     }
   };
 
-  const transcribeChunk = async (blob: Blob) => {
-    if (blob.size === 0) return;
-    setIsTranscribing(true);
-    try {
-      const fd = new FormData(); fd.append("audio", blob, "chunk.webm");
-      const res = await fetch(`${API_URL}/api/voice/transcribe`, { method: "POST", body: fd });
-      const data = await res.json();
-      if (res.ok && data.text) {
-        const next = (transcriptRef.current ? transcriptRef.current + " " : "") + data.text.trim();
-        transcriptRef.current = next;
-        setTranscript(next);
-        await pushLive(next, false); // stream this chunk to nurse + doctor immediately
-      }
-    } catch (e) { setError(`Transcription: ${e instanceof Error ? e.message : "failed"}`); }
-    finally { setIsTranscribing(false); }
-  };
-
-  // Record in short chunks: each chunk is a self-contained webm we transcribe and
-  // push live, so dictation flows to the other CRMs while we keep talking.
-  const recordChunk = useCallback(() => {
-    if (!recordingRef.current || !streamRef.current) return;
-    const mr = new MediaRecorder(streamRef.current, { mimeType: "audio/webm" });
-    const chunks: Blob[] = [];
-    mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-    mr.onstop = async () => {
-      await transcribeChunk(new Blob(chunks, { type: "audio/webm" }));
-      if (recordingRef.current) recordChunk(); // next chunk
+  const startRec = useCallback(() => {
+    const SR = (window.SpeechRecognition ?? (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition);
+    if (!SR) { setError("Speech recognition not supported — use Chrome or Edge"); return; }
+    const sr = new SR();
+    sr.continuous = true;
+    sr.interimResults = false;
+    sr.lang = "en-US";
+    sr.onresult = async (e: SpeechRecognitionEvent) => {
+      const chunk = Array.from(e.results)
+        .slice(e.resultIndex)
+        .filter(r => r.isFinal)
+        .map(r => r[0].transcript.trim())
+        .join(" ");
+      if (!chunk) return;
+      const next = (transcriptRef.current ? transcriptRef.current + " " : "") + chunk;
+      transcriptRef.current = next;
+      setTranscript(next);
+      await pushLive(next, false);
     };
-    mrRef.current = mr;
-    mr.start();
-    setTimeout(() => { if (mr.state !== "inactive") mr.stop(); }, CHUNK_MS);
+    sr.onerror = (e: SpeechRecognitionErrorEvent) => {
+      if (e.error !== "aborted") setError(`Mic error: ${e.error}`);
+    };
+    srRef.current = sr;
+    recordingRef.current = true;
+    setIsRecording(true);
+    sr.start();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const startRec = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      recordingRef.current = true;
-      setIsRecording(true);
-      recordChunk();
-    } catch { setError("Mic access denied — type below"); }
-  }, [recordChunk]);
 
   const stopRec = useCallback(() => {
     recordingRef.current = false;
     setIsRecording(false);
-    if (mrRef.current && mrRef.current.state !== "inactive") mrRef.current.stop();
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
-    // Finalize shortly after, once the last chunk has been transcribed + appended.
-    setTimeout(() => { if (transcriptRef.current.trim()) pushLive(transcriptRef.current, true); }, 1200);
-  }, []);
+    srRef.current?.stop();
+    srRef.current = null;
+    setTimeout(() => { if (transcriptRef.current.trim()) pushLive(transcriptRef.current, true); }, 400);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced live push while typing (recording drives its own pushes per chunk).
   useEffect(() => {
@@ -363,7 +343,7 @@ export default function ParamedicApp() {
                       <p className="font-semibold text-gray-900 text-xs truncate flex-1">
                         {e.patientContext?.name ?? "Incoming…"}
                       </p>
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-gray-400" suppressHydrationWarning>
                         {new Date(e.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
                     </div>
@@ -389,14 +369,14 @@ export default function ParamedicApp() {
               <div className="flex items-center gap-2 pb-2 border-b border-gray-100 flex-shrink-0">
                 <button
                   onClick={isRecording ? stopRec : startRec}
-                  disabled={isProcessing || isTranscribing}
+                  disabled={isProcessing}
                   className={`flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold text-white transition-all disabled:opacity-50 ${isRecording ? "bg-red-500 animate-pulse" : "bg-[#2563a8] hover:bg-[#1e3f7a]"}`}
                 >
                   {isRecording ? "Stop Recording" : "Start Dictation"}
                 </button>
                 {isRecording && <span className="flex h-2 w-2"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"/><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"/></span>}
-                {isTranscribing && <span className="text-xs text-blue-600 flex items-center gap-1"><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Transcribing…</span>}
-                <span className="ml-auto text-xs text-gray-400">{words} words · ElevenLabs Scribe v1</span>
+                {isRecording && <span className="text-xs text-gray-500">Listening…</span>}
+                <span className="ml-auto text-xs text-gray-400">{words} words</span>
               </div>
 
               {/* Transcript area - takes remaining space */}
@@ -415,7 +395,7 @@ export default function ParamedicApp() {
                 <button onClick={() => setTranscript("")} className="px-3 py-1.5 text-xs border border-gray-300 text-gray-600 rounded hover:bg-gray-50">Clear</button>
                 <button
                   onClick={handleSubmit}
-                  disabled={!transcript.trim() || isProcessing || isTranscribing}
+                  disabled={!transcript.trim() || isProcessing}
                   className="flex-1 py-1.5 bg-[#2563a8] hover:bg-[#1e3f7a] text-white text-xs font-semibold rounded disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                 >
                   {isProcessing ? <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Running 9-Agent Pipeline…</> : "Submit to Agent Pipeline"}

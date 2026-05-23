@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Encounter } from "@/types";
 import { getEncounters, commitEncounter, subscribeToEncounters } from "@/lib/api";
+import { useSession } from "@/lib/useSession";
 
 function Panel({ title, badge, children, className="" }: { title:string; badge?:React.ReactNode; children:React.ReactNode; className?:string }) {
   return (
@@ -29,6 +30,7 @@ function ESIBadge({ level }: { level: string }) {
 }
 
 export default function DoctorCRM() {
+  const { session } = useSession();
   const [encounters, setEncounters] = useState<Encounter[]>([]);
   const [selected, setSelected] = useState<Encounter|null>(null);
   const [approving, setApproving] = useState(false);
@@ -128,17 +130,31 @@ export default function DoctorCRM() {
           <span className="font-semibold">{selected?.patientContext?.name ?? "Select Patient"}</span>
         </div>
         <div className="ml-auto flex items-center gap-3 text-sm opacity-70">
-          <span>Search</span><span>History</span><span>New</span><span>Settings</span><span>Help</span>
-          <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold">JC</div>
+          <span>Search</span><span>History</span><span>New</span><span>Settings</span>
+          {session && (
+            <span className="flex items-center gap-2">
+              <span className="text-xs text-green-400 font-medium">{session.name} · {session.role}</span>
+              <a href="http://localhost:3001/auth/logout" className="text-xs text-red-300 hover:text-red-100">Sign out</a>
+            </span>
+          )}
+          <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold">
+            {session?.name?.[0] ?? "?"}
+          </div>
         </div>
       </nav>
 
       {/* Action bar */}
       <div className="bg-[#2563a8] text-white flex items-center h-9 px-3 gap-1 flex-shrink-0">
-        <button onClick={handleApprove} disabled={!selected||approving||isApproved}
-          className="text-xs font-semibold px-4 h-7 rounded border border-white/40 bg-white/10 hover:bg-white/20 disabled:opacity-50 transition-colors">
-          {approving?"APPROVING...":"APPROVE ORDERS"}
-        </button>
+        {session?.permissions.includes("approve_orders") ? (
+          <button onClick={handleApprove} disabled={!selected||approving||isApproved}
+            className="text-xs font-semibold px-4 h-7 rounded border border-white/40 bg-white/10 hover:bg-white/20 disabled:opacity-50 transition-colors">
+            {approving?"APPROVING...":"APPROVE ORDERS"}
+          </button>
+        ) : (
+          <span className="text-xs px-4 h-7 flex items-center rounded border border-white/20 bg-red-900/40 text-red-200 cursor-not-allowed">
+            REQUIRES PHYSICIAN AUTHORIZATION
+          </span>
+        )}
         {["View Audit","Print Orders","Request Consult","Reject Encounter","Refresh"].map(a=>(
           <button key={a} className="text-xs font-medium px-3 h-7 rounded border border-white/20 hover:bg-white/10 transition-colors">{a}</button>
         ))}
@@ -451,10 +467,16 @@ export default function DoctorCRM() {
                   <p className="text-gray-400 mt-0.5">{selected?.approvedAt ? new Date(selected.approvedAt).toLocaleString() : ""}</p>
                 </div>
               ) : selected ? (
-                <button onClick={handleApprove} disabled={approving}
-                  className="w-full py-2.5 bg-[#2563a8] hover:bg-[#1e3f7a] text-white text-sm font-bold rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                  {approving ? <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Processing...</> : "Approve & Commit to EHR"}
-                </button>
+                session?.permissions.includes("approve_orders") ? (
+                  <button onClick={handleApprove} disabled={approving}
+                    className="w-full py-2.5 bg-[#2563a8] hover:bg-[#1e3f7a] text-white text-sm font-bold rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    {approving ? <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Processing...</> : "Approve & Commit to EHR"}
+                  </button>
+                ) : (
+                  <div className="w-full py-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded text-center">
+                    Requires physician authorization
+                  </div>
+                )
               ) : <p className="text-xs text-gray-400 italic text-center">No feedback records found</p>}
             </div>
           </Panel>
