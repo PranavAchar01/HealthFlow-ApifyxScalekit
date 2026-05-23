@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from '@/lib/supabase';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -475,6 +476,63 @@ export default function NineOneOne() {
   const [contactFormOpen, setContactFormOpen] = useState(false);
   const [contactForm, setContactForm] = useState({ name: "", dob: "", phone: "", address: "", patientId: "" });
 
+  // ── Supabase helpers ──────────────────────────────────────────────────────
+
+  async function fetchPatients(): Promise<Patient[]> {
+    const { data, error } = await supabase
+      .from('HealthFlow_transcript')
+      .select('*')
+      .order('id', { ascending: true });
+
+    if (error || !data) {
+      console.error('Supabase fetch error:', error);
+      return INITIAL_PATIENTS; // fallback to hardcoded data if DB fails
+    }
+
+    return data.map((row: Record<string, unknown>) => ({
+      ...row,
+      age: row.age != null ? row.age : null,
+      conditions: typeof row.conditions === 'string' ? row.conditions.split('|') : [],
+      medications: typeof row.medications === 'string' ? row.medications.split('|') : [],
+      allergies: typeof row.allergies === 'string' ? (row.allergies as string).split('|').filter(Boolean) : [],
+      transcriptLines: typeof row.transcriptLines === 'string'
+        ? JSON.parse(row.transcriptLines as string)
+        : row.transcriptLines ?? [],
+      notesSummary: typeof row.notesSummary === 'string'
+        ? JSON.parse(row.notesSummary as string)
+        : row.notesSummary ?? {},
+      emergencyContact: row.emergencyContact && row.emergencyContact !== ''
+        ? (typeof row.emergencyContact === 'string'
+          ? JSON.parse(row.emergencyContact as string)
+          : row.emergencyContact)
+        : null,
+      isUnknownPatient: row.isUnknownPatient === true || row.isUnknownPatient === 'true',
+      risk: (row.risk as Patient['risk']) || 'UNKNOWN',
+    })) as Patient[];
+  }
+
+  async function updatePatientInSupabase(patientId: string, updates: Record<string, unknown>) {
+    const { error } = await supabase
+      .from('HealthFlow_transcript')
+      .update(updates)
+      .eq('id', patientId);
+
+    if (error) console.error('Supabase update error:', error);
+  }
+
+  // Load patients from Supabase on mount; fall back to INITIAL_PATIENTS if unavailable
+  useEffect(() => {
+    fetchPatients().then(patients => {
+      if (patients.length > 0) {
+        setScenarios(patients);
+        setSelected(patients[0]);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ─────────────────────────────────────────────────────────────────────────
+
   const launchScenario = async (scenario: Patient) => {
     setSelected(scenario);
     setLoading(true);
@@ -518,6 +576,19 @@ export default function NineOneOne() {
         orders: e.draftOrders?.length ?? 0,
         auditEntries: e.auditTrail?.length ?? 0,
       });
+
+      // Persist pipeline results back to Supabase (fire-and-forget — UI already updated above)
+      updatePatientInSupabase(scenario.id, {
+        status: e.status,
+        acuity: e.acuity,
+        chiefComplaint: e.structuredData?.chiefComplaint ?? scenario.chiefComplaint,
+        diagnosis: e.diagnosis?.primary ?? null,
+        diagnosisConfidence: e.diagnosis?.confidence ?? null,
+        safetyFlags: JSON.stringify(e.safetyFlags ?? []),
+        draftOrders: JSON.stringify(e.draftOrders ?? []),
+        lastPipelineRun: new Date().toISOString(),
+      }).catch(() => { /* non-critical — UI is unaffected */ });
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "Pipeline failed");
     } finally {
