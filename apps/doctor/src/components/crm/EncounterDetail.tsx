@@ -92,38 +92,29 @@ export function EncounterDetail({ encounter, onApprove, isApproving }: Encounter
           {/* Vitals */}
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="font-semibold text-gray-900 mb-3">Vitals</h3>
-            <dl className="grid grid-cols-2 gap-2 text-sm">
-              {encounter.structuredData?.vitals.heartRate && (
-                <>
-                  <dt className="text-gray-500">Heart Rate</dt>
-                  <dd className="font-mono font-medium">{encounter.structuredData.vitals.heartRate} bpm</dd>
-                </>
-              )}
-              {encounter.structuredData?.vitals.bloodPressure && (
-                <>
-                  <dt className="text-gray-500">Blood Pressure</dt>
-                  <dd className="font-mono font-medium">{encounter.structuredData.vitals.bloodPressure} mmHg</dd>
-                </>
-              )}
-              {encounter.structuredData?.vitals.spO2 && (
-                <>
-                  <dt className="text-gray-500">SpO2</dt>
-                  <dd className="font-mono font-medium">{encounter.structuredData.vitals.spO2}%</dd>
-                </>
-              )}
-              {encounter.structuredData?.vitals.temperature && (
-                <>
-                  <dt className="text-gray-500">Temperature</dt>
-                  <dd className="font-mono font-medium">{encounter.structuredData.vitals.temperature}°F</dd>
-                </>
-              )}
-              {encounter.structuredData?.vitals.gcs && (
-                <>
-                  <dt className="text-gray-500">GCS</dt>
-                  <dd className="font-mono font-medium">{encounter.structuredData.vitals.gcs}/15</dd>
-                </>
-              )}
-            </dl>
+            {(() => {
+              const vit = encounter.structuredData?.vitals;
+              const rows = [
+                { label: "Heart Rate",    value: vit?.heartRate,       unit: "bpm"  },
+                { label: "Blood Pressure",value: vit?.bloodPressure,   unit: "mmHg" },
+                { label: "SpO2",          value: vit?.spO2,            unit: "%"    },
+                { label: "Temperature",   value: vit?.temperature,     unit: "°F"   },
+                { label: "Resp. Rate",    value: vit?.respiratoryRate, unit: "/min" },
+                { label: "GCS",           value: vit?.gcs,             unit: "/15"  },
+              ].filter(r => r.value != null && r.value !== "");
+              return rows.length > 0 ? (
+                <dl className="grid grid-cols-2 gap-2 text-sm">
+                  {rows.map(({ label, value, unit }) => (
+                    <>
+                      <dt key={label + "dt"} className="text-gray-500">{label}</dt>
+                      <dd key={label + "dd"} className="font-mono font-medium">{String(value)} {unit}</dd>
+                    </>
+                  ))}
+                </dl>
+              ) : (
+                <p className="text-sm text-gray-400">Awaiting nurse vitals…</p>
+              );
+            })()}
           </div>
 
           {/* Diagnosis */}

@@ -415,17 +415,6 @@ export default function ParamedicApp() {
                   <p className="text-gray-400 mb-0.5">Chief Complaint</p>
                   <p className="font-semibold text-gray-900">{result.chiefComplaint}</p>
                 </div>
-                <div className="pb-2 border-b border-gray-100">
-                  <p className="text-gray-400 mb-0.5">AI Diagnosis</p>
-                  <p className="font-semibold text-blue-700">{result.diagnosis}</p>
-                  {result.confidence && (
-                    <div className="mt-1">
-                      <div className="flex justify-between text-xs mb-0.5"><span className="text-gray-400">Confidence</span><span className="font-medium">{(result.confidence*100).toFixed(0)}%</span></div>
-                      <div className="h-1.5 bg-gray-200 rounded-full"><div className="h-1.5 bg-blue-500 rounded-full" style={{width:`${result.confidence*100}%`}}/></div>
-                    </div>
-                  )}
-                  {result.reasoning && <p className="text-gray-500 mt-1 text-xs leading-relaxed">{result.reasoning}</p>}
-                </div>
                 <div className="grid grid-cols-2 gap-2 pb-2 border-b border-gray-100">
                   {[["Orders",result.orders.length,"text-gray-900"],["Agents",result.auditEntries,"text-gray-900"],["Flags",result.safetyFlags.length,result.safetyFlags.length>0?"text-red-600":"text-gray-900"],["Acuity",result.acuity.toUpperCase(),result.acuity==="critical"?"text-red-700 font-bold":"text-gray-900"]].map(([l,v,cls])=>(
                     <div key={String(l)} className="bg-gray-50 rounded p-2 text-center">

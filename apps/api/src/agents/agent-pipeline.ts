@@ -80,15 +80,15 @@ function mergeContext(existing: PatientContext | undefined, extracted: PatientCo
   if (!extracted) return existing;
   if (!existing) return extracted;
   const realName = existing.name && existing.name !== "Unknown Patient" && !/^unknown/i.test(existing.name);
-  const realAllergies = existing.allergies.filter((a) => a && a.toUpperCase() !== "NKDA");
+  const realAllergies = (existing.allergies ?? []).filter((a) => a && a.toUpperCase() !== "NKDA");
   return {
     patientId: existing.patientId || extracted.patientId,
     name: realName ? existing.name : extracted.name,
     age: existing.age || extracted.age,
     sex: existing.sex && existing.sex !== "Unknown" ? existing.sex : extracted.sex,
     allergies: realAllergies.length ? existing.allergies : extracted.allergies,
-    currentMedications: existing.currentMedications.length ? existing.currentMedications : extracted.currentMedications,
-    conditions: existing.conditions.length ? existing.conditions : extracted.conditions,
+    currentMedications: (existing.currentMedications ?? []).length ? existing.currentMedications : extracted.currentMedications,
+    conditions: (existing.conditions ?? []).length ? existing.conditions : extracted.conditions,
     recentLabs: existing.recentLabs ?? extracted.recentLabs,
   };
 }

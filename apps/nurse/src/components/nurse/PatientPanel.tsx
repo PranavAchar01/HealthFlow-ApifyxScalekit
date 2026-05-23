@@ -2,7 +2,7 @@
 import { useState } from "react";
 import type { Encounter } from "@/types";
 import { AcuityPill, StatusPill, TriagePill } from "@/components/ui/badges";
-import { addNursingNote, setTriageStatus } from "@/lib/api";
+import { addNursingNote, setTriageStatus, updateVitals } from "@/lib/api";
 
 const CATEGORIES = ["assessment", "vitals_update", "medication", "escalation", "general"] as const;
 const TRIAGE_OPTIONS = ["pending", "in_assessment", "ready_for_doctor", "escalated"] as const;
@@ -17,7 +17,34 @@ export function PatientPanel({ encounter, onUpdate }: Props) {
   const [category, setCategory] = useState<string>("assessment");
   const [isSaving, setIsSaving] = useState(false);
   const [isTriaging, setIsTriaging] = useState(false);
+  const [isSavingVitals, setIsSavingVitals] = useState(false);
   const doctorUrl = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL;
+
+  const [vitalsForm, setVitalsForm] = useState(() => {
+    const v = encounter.structuredData?.vitals ?? {};
+    return {
+    heartRate:      String(v.heartRate      ?? ""),
+    bloodPressure:  String(v.bloodPressure  ?? ""),
+    spO2:           String(v.spO2           ?? ""),
+    temperature:    String(v.temperature    ?? ""),
+    respiratoryRate:String(v.respiratoryRate?? ""),
+      gcs:            String(v.gcs            ?? ""),
+    };
+  });
+
+  const handleSaveVitals = async () => {
+    setIsSavingVitals(true);
+    try {
+      const payload: Record<string, string | number> = {};
+      Object.entries(vitalsForm).forEach(([k, val]) => {
+        if (val.trim()) payload[k] = isNaN(Number(val)) ? val : Number(val);
+      });
+      const updated = await updateVitals(encounter.id, payload);
+      onUpdate(updated);
+    } finally {
+      setIsSavingVitals(false);
+    }
+  };
 
   const handleAddNote = async () => {
     if (!note.trim()) return;
@@ -40,8 +67,6 @@ export function PatientPanel({ encounter, onUpdate }: Props) {
       setIsTriaging(false);
     }
   };
-
-  const v = encounter.structuredData?.vitals ?? {};
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -106,25 +131,32 @@ export function PatientPanel({ encounter, onUpdate }: Props) {
         <section>
           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Vitals</h3>
           <div className="grid grid-cols-3 gap-2">
-            {[
-              { label: "HR", value: v.heartRate, unit: "bpm" },
-              { label: "BP", value: v.bloodPressure, unit: "mmHg" },
-              { label: "SpO₂", value: v.spO2, unit: "%" },
-              { label: "Temp", value: v.temperature, unit: "°F" },
-              { label: "RR", value: v.respiratoryRate, unit: "/min" },
-              { label: "GCS", value: v.gcs, unit: "/15" },
-            ].map(({ label, value, unit }) => (
-              <div key={label} className={`bg-white rounded-lg border p-2.5 text-center ${
-                !value ? "opacity-40" : ""
-              }`}>
-                <p className="text-xs text-gray-500">{label}</p>
-                <p className="text-lg font-bold text-gray-900">
-                  {value ?? "—"}
-                </p>
-                {value && <p className="text-xs text-gray-400">{unit}</p>}
+            {([
+              { label: "HR",   key: "heartRate"       as const, unit: "bpm"  },
+              { label: "BP",   key: "bloodPressure"   as const, unit: "mmHg" },
+              { label: "SpO₂", key: "spO2"            as const, unit: "%"    },
+              { label: "Temp", key: "temperature"     as const, unit: "°F"   },
+              { label: "RR",   key: "respiratoryRate" as const, unit: "/min" },
+              { label: "GCS",  key: "gcs"             as const, unit: "/15"  },
+            ] as { label: string; key: keyof typeof vitalsForm; unit: string }[]).map(({ label, key, unit }) => (
+              <div key={label} className="bg-white rounded-lg border p-2.5">
+                <p className="text-xs text-gray-500 mb-1">{label} <span className="text-gray-300">{unit}</span></p>
+                <input
+                  value={vitalsForm[key]}
+                  onChange={e => setVitalsForm(f => ({ ...f, [key]: e.target.value }))}
+                  placeholder="—"
+                  className="w-full text-lg font-bold text-gray-900 bg-transparent border-b border-gray-200 focus:border-teal-500 outline-none text-center pb-0.5"
+                />
               </div>
             ))}
           </div>
+          <button
+            onClick={handleSaveVitals}
+            disabled={isSavingVitals}
+            className="mt-2 w-full py-1.5 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
+          >
+            {isSavingVitals ? "Saving…" : "Update Vitals"}
+          </button>
         </section>
 
         {/* Safety flags */}
@@ -249,6 +281,16 @@ export function PatientPanel({ encounter, onUpdate }: Props) {
             {isSaving ? "..." : "Add"}
           </button>
         </div>
+        <button
+          onClick={async () => {
+            await handleSaveVitals();
+            await handleTriage("ready_for_doctor");
+          }}
+          disabled={isSavingVitals || isTriaging}
+          className="mt-2 w-full py-2 bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+        >
+          {isSavingVitals || isTriaging ? "Finishing…" : "Finish & Send to Doctor"}
+        </button>
       </div>
     </div>
   );

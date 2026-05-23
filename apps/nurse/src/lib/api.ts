@@ -34,6 +34,17 @@ export async function addNursingNote(
   return data.encounter;
 }
 
+export async function updateVitals(
+  encounterId: string,
+  vitals: Record<string, string | number>
+): Promise<Encounter> {
+  const data = await apiFetch<{ encounter: Encounter }>(`/api/encounters/${encounterId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ vitals }),
+  });
+  return data.encounter;
+}
+
 export async function setTriageStatus(
   encounterId: string,
   triageStatus: string

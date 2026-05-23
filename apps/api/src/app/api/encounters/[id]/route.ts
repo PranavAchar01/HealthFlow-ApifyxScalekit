@@ -41,7 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   const body = await req.json();
-  const { note, category, triageStatus } = body;
+  const { note, category, triageStatus, vitals } = body;
 
   if (note) {
     const nursingNote: NursingNote = {
@@ -62,6 +62,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       `${token.name} added nursing note [${category ?? "general"}]: ${note.substring(0, 100)}`,
       token.userId,
       token.name
+    );
+    encounter.auditTrail.push(audit);
+  }
+
+  if (vitals && typeof vitals === "object") {
+    encounter.structuredData = {
+      ...(encounter.structuredData ?? {}),
+      vitals: { ...(encounter.structuredData?.vitals ?? {}), ...vitals },
+    };
+    const audit = createAuditEntry(
+      "case_supervisor", "VITALS_UPDATE",
+      `${token.name} updated vitals: ${Object.entries(vitals).map(([k,v]) => `${k}=${v}`).join(", ")}`,
+      token.userId, token.name
     );
     encounter.auditTrail.push(audit);
   }
