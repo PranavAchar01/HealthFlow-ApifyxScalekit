@@ -28,6 +28,9 @@
       ],
       "@guestflow/types": [
         "../../packages/types/index.ts"
+      ],
+      "@healthflow/supabase": [
+        "../../packages/supabase/index.ts"
       ]
     }
   },

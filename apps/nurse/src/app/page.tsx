@@ -65,9 +65,8 @@ export default function NurseStation() {
         if (selectedIdRef.current === id) setSelected(null);
       },
     });
-    // 2s polling fallback ensures realtime works even when the client lands
-    // on a different Vercel lambda than the one running the pipeline.
-    const poll = setInterval(refresh, 2000);
+    // 3s polling keeps the nurse view fresh from Supabase HealthFlow_transcript.
+    const poll = setInterval(refresh, 3000);
     return () => { dispose(); clearInterval(poll); };
   }, [refresh]);
 

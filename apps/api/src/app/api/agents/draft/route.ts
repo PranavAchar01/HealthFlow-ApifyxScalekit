@@ -4,6 +4,7 @@ import { runAgentPipeline } from "@/agents/agent-pipeline";
 import { upsertEncounter } from "@/lib/store";
 import { createAuditEntry } from "@/lib/audit";
 import { corsHeaders, corsResponse } from "@/lib/cors";
+import { createServerSupabase } from "@/lib/supabase";
 
 export async function OPTIONS(req: NextRequest) {
   return corsResponse(req.headers.get("origin"));
@@ -33,6 +34,32 @@ export async function POST(req: NextRequest) {
 
   const encounter = await runAgentPipeline(transcript, token.userId, token.name, { patientContext });
   await upsertEncounter(encounter);
+
+  // Mirror pipeline results to HealthFlow_transcript so nurse/doctor views
+  // (which poll that table directly) pick up the output within their next poll.
+  const pId = encounter.patientContext?.patientId;
+  if (pId) {
+    const sb = createServerSupabase();
+    if (sb) {
+      sb.from('HealthFlow_transcript')
+        .update({
+          structuredData      : JSON.stringify(encounter.structuredData      ?? null),
+          diagnosis           : JSON.stringify(encounter.diagnosis           ?? null),
+          draftOrders         : JSON.stringify(encounter.draftOrders         ?? []),
+          safetyFlags         : JSON.stringify(encounter.safetyFlags         ?? []),
+          safetyRecommendation: encounter.safetyRecommendation ?? null,
+          auditTrail          : JSON.stringify(encounter.auditTrail          ?? []),
+          status              : encounter.status,
+          acuity              : encounter.acuity,
+          encounterId         : encounter.id,
+          updatedAt           : new Date().toISOString(),
+        })
+        .eq('patientId', pId)
+        .then(({ error }) => {
+          if (error) console.error('[api/draft] HealthFlow_transcript write-back error:', error);
+        });
+    }
+  }
 
   return NextResponse.json({
     success: true,

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useCallback, useEffect } from "react";
+import { supabase } from '@healthflow/supabase';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
 
@@ -202,6 +203,30 @@ export default function ParamedicApp() {
         orders: e.draftOrders ?? [],
         auditEntries: e.auditTrail?.length ?? 0,
       });
+
+      // Write ALL pipeline results back to HealthFlow_transcript (fire-and-forget).
+      // Match by patientId so the 911, nurse, and doctor views all see the update.
+      const patientId = e.patientContext?.patientId;
+      if (patientId) {
+        supabase
+          .from('HealthFlow_transcript')
+          .update({
+            structuredData      : JSON.stringify(e.structuredData      ?? null),
+            diagnosis           : JSON.stringify(e.diagnosis           ?? null),
+            draftOrders         : JSON.stringify(e.draftOrders         ?? []),
+            safetyFlags         : JSON.stringify(e.safetyFlags         ?? []),
+            safetyRecommendation: e.safetyRecommendation ?? null,
+            auditTrail          : JSON.stringify(e.auditTrail          ?? []),
+            status              : e.status,
+            acuity              : e.acuity,
+            encounterId         : e.id,
+            updatedAt           : new Date().toISOString(),
+          })
+          .eq('patientId', patientId)
+          .then(({ error }) => {
+            if (error) console.error('[paramedic] HealthFlow_transcript write-back error:', error);
+          });
+      }
     } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
     finally { setIsProcessing(false); }
   };
