@@ -192,11 +192,10 @@ export async function runDownstream(encounter: Encounter): Promise<Encounter> {
   // Drug/allergy check + safety controller
   if (encounter.draftOrders && encounter.patientContext) {
     encounter.status = "safety_flagged";
-    const drugResult = runDrugAllergyCheck(encounter.draftOrders, encounter.patientContext);
+    const drugResult = await runDrugAllergyCheck(encounter.draftOrders, encounter.patientContext);
     encounter.draftOrders = drugResult.orders;
     encounter.safetyFlags = drugResult.conflicts;
-    const drugAudit = createAuditEntry("drug_allergy_check", "SAFETY_SCAN",
-      `Apify drug interaction check: ${drugResult.conflicts.length} conflicts found. ${drugResult.conflicts.filter((c) => c.severity === "contraindicated").length} contraindicated.`);
+    const drugAudit = createAuditEntry("drug_allergy_check", "SAFETY_SCAN", drugResult.auditNote);
     encounter.auditTrail.push(drugAudit);
 
     const safetyResult = runSafetyController(drugResult.orders, drugResult.conflicts);
@@ -251,7 +250,8 @@ export async function runProgressivePipeline(encounter: Encounter): Promise<Enco
 export async function runAgentPipeline(
   rawText: string,
   paramedicId: string,
-  paramedicName: string
+  paramedicName: string,
+  opts?: { patientContext?: PatientContext }
 ): Promise<Encounter> {
   const encounterId = uuidv4();
   const now = new Date().toISOString();
@@ -261,6 +261,8 @@ export async function runAgentPipeline(
     createdAt: now, updatedAt: now,
     paramedicId, paramedicName, rawTranscript: rawText, auditTrail: [],
     triageStatus: "pending", nursingNotes: [],
+    // Seed patient context from dispatch (911) if provided
+    patientContext: opts?.patientContext,
   };
 
   // Agent 1: Voice capture — publish immediately so the card appears in queues.
