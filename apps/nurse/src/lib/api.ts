@@ -46,9 +46,10 @@ export async function setTriageStatus(
 }
 
 export type EncounterStreamHandlers = {
-  onSnapshot: (encounters: Encounter[]) => void;
+  onSnapshot: (encounters: Encounter[], selectedId?: string | null) => void;
   onUpsert: (encounter: Encounter) => void;
   onDelete?: (id: string) => void;
+  onSelect?: (id: string | null) => void;
   onError?: (err: Event) => void;
 };
 
@@ -60,8 +61,8 @@ export function subscribeToEncounters(handlers: EncounterStreamHandlers): () => 
 
   es.addEventListener("snapshot", (e) => {
     try {
-      const data = JSON.parse((e as MessageEvent).data) as { encounters: Encounter[] };
-      handlers.onSnapshot(data.encounters);
+      const data = JSON.parse((e as MessageEvent).data) as { encounters: Encounter[]; selectedId?: string | null };
+      handlers.onSnapshot(data.encounters, data.selectedId ?? null);
     } catch (err) { console.error("[stream] snapshot parse", err); }
   });
 
@@ -77,6 +78,13 @@ export function subscribeToEncounters(handlers: EncounterStreamHandlers): () => 
       const { id } = JSON.parse((e as MessageEvent).data) as { id: string };
       handlers.onDelete?.(id);
     } catch (err) { console.error("[stream] delete parse", err); }
+  });
+
+  es.addEventListener("select", (e) => {
+    try {
+      const { id } = JSON.parse((e as MessageEvent).data) as { id: string | null };
+      handlers.onSelect?.(id);
+    } catch (err) { console.error("[stream] select parse", err); }
   });
 
   es.onerror = (err) => {

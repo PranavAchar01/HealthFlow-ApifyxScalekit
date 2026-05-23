@@ -38,7 +38,7 @@ function TopNav({ subtitle }: { subtitle: string }) {
         <span className="font-semibold">{subtitle}</span>
       </div>
       <div className="ml-auto flex items-center gap-3 text-sm opacity-70">
-        <span>🔍</span><span>⚙</span>
+        <span>Search</span><span>Settings</span>
         <div className="w-7 h-7 rounded-full bg-orange-500 flex items-center justify-center text-xs font-bold">SM</div>
       </div>
     </nav>
@@ -67,6 +67,19 @@ function Panel({ title, children, className="" }: { title: string; children: Rea
   );
 }
 
+const AUTH = { "Content-Type": "application/json", Authorization: "Bearer paramedic_sarah" };
+const CHUNK_MS = 3500; // how often we cut an audio chunk to transcribe + push live
+
+const resultFromLive = (e: LiveEncounter): Result => ({
+  encounterId: e.id, status: e.status, acuity: e.acuity,
+  chiefComplaint: e.structuredData?.chiefComplaint,
+  diagnosis: e.diagnosis?.primary, confidence: e.diagnosis?.confidence,
+  reasoning: e.diagnosis?.reasoning,
+  safetyFlags: e.safetyFlags ?? [],
+  orders: e.draftOrders ?? [],
+  auditEntries: e.auditTrail?.length ?? 0,
+});
+
 export default function ParamedicApp() {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -75,11 +88,23 @@ export default function ParamedicApp() {
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [liveEncounters, setLiveEncounters] = useState<LiveEncounter[]>([]);
+
   const mrRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const recordingRef = useRef(false);
+  const transcriptRef = useRef("");
+  const pushingRef = useRef(false);
+
+  // The patient currently in focus across all stations. 911 (or any station)
+  // broadcasts this; dictation pushes into exactly this encounter so the nurse +
+  // doctor CRMs fill in live as we talk.
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const activeIdRef = useRef<string | null>(null);
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+  useEffect(() => { transcriptRef.current = transcript; }, [transcript]);
 
   // Live stream — encounters created by 911 dispatch (or any other paramedic)
-  // appear instantly here as the agent pipeline progresses.
+  // appear instantly here, and `select` keeps our active patient in sync.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const es = new EventSource(`${API_URL}/api/encounters/stream`);
@@ -90,8 +115,13 @@ export default function ParamedicApp() {
     });
     es.addEventListener("snapshot", (ev) => {
       try {
-        const { encounters } = JSON.parse((ev as MessageEvent).data) as { encounters: LiveEncounter[] };
+        const { encounters, selectedId } = JSON.parse((ev as MessageEvent).data) as { encounters: LiveEncounter[]; selectedId?: string | null };
         setLiveEncounters(encounters.slice(0, 10));
+        if (selectedId) {
+          setActiveId(selectedId);
+          const e = encounters.find(x => x.id === selectedId);
+          if (e) setResult(resultFromLive(e));
+        }
       } catch {}
     });
     es.addEventListener("upsert", (ev) => {
@@ -103,25 +133,21 @@ export default function ParamedicApp() {
         setLiveEncounters(prev => prev.filter(e => e.id !== id));
       } catch {}
     });
+    es.addEventListener("select", (ev) => {
+      try {
+        const { id } = JSON.parse((ev as MessageEvent).data) as { id: string | null };
+        if (id) setActiveId(id);
+      } catch {}
+    });
     return () => es.close();
   }, []);
 
   const loadIncoming = (e: LiveEncounter) => {
-    setResult({
-      encounterId: e.id,
-      status: e.status,
-      acuity: e.acuity,
-      chiefComplaint: e.structuredData?.chiefComplaint,
-      diagnosis: e.diagnosis?.primary,
-      confidence: e.diagnosis?.confidence,
-      reasoning: e.diagnosis?.reasoning,
-      safetyFlags: e.safetyFlags ?? [],
-      orders: e.draftOrders ?? [],
-      auditEntries: e.auditTrail?.length ?? 0,
-    });
+    setActiveId(e.id);          // talk now targets this patient
+    setResult(resultFromLive(e));
   };
 
-  // When an encounter we're viewing gets updated by the stream, keep the result in sync
+  // When the focused encounter updates on the stream, keep the result panel in sync.
   useEffect(() => {
     if (!result) return;
     const live = liveEncounters.find(e => e.id === result.encounterId);
@@ -139,54 +165,106 @@ export default function ParamedicApp() {
     } : r);
   }, [liveEncounters, result?.encounterId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Push the accumulated transcript into the shared encounter. Creates one on the
+  // fly (without auto-running the pipeline) if no patient is in focus yet.
+  const pushLive = async (text: string, finalize: boolean) => {
+    if (!text.trim()) return;
+    if (!finalize && pushingRef.current) return; // skip overlapping live ticks
+    if (!finalize) pushingRef.current = true;
+    try {
+      let id = activeIdRef.current;
+      if (!id) {
+        const res = await fetch(`${API_URL}/api/encounters/seed`, {
+          method: "POST", headers: AUTH,
+          body: JSON.stringify({ patient: {}, transcript: text, autorun: false }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        id = data.encounter.id as string;
+        setActiveId(id); activeIdRef.current = id;
+      }
+      const res2 = await fetch(`${API_URL}/api/encounters/${id}/live`, {
+        method: "POST", headers: AUTH,
+        body: JSON.stringify({ transcript: text, finalize }),
+      });
+      const data2 = await res2.json();
+      if (!res2.ok) throw new Error(data2.error);
+      setResult(resultFromLive(data2.encounter));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Live sync failed");
+    } finally {
+      if (!finalize) pushingRef.current = false;
+    }
+  };
+
+  const transcribeChunk = async (blob: Blob) => {
+    if (blob.size === 0) return;
+    setIsTranscribing(true);
+    try {
+      const fd = new FormData(); fd.append("audio", blob, "chunk.webm");
+      const res = await fetch(`${API_URL}/api/voice/transcribe`, { method: "POST", body: fd });
+      const data = await res.json();
+      if (res.ok && data.text) {
+        const next = (transcriptRef.current ? transcriptRef.current + " " : "") + data.text.trim();
+        transcriptRef.current = next;
+        setTranscript(next);
+        await pushLive(next, false); // stream this chunk to nurse + doctor immediately
+      }
+    } catch (e) { setError(`Transcription: ${e instanceof Error ? e.message : "failed"}`); }
+    finally { setIsTranscribing(false); }
+  };
+
+  // Record in short chunks: each chunk is a self-contained webm we transcribe and
+  // push live, so dictation flows to the other CRMs while we keep talking.
+  const recordChunk = useCallback(() => {
+    if (!recordingRef.current || !streamRef.current) return;
+    const mr = new MediaRecorder(streamRef.current, { mimeType: "audio/webm" });
+    const chunks: Blob[] = [];
+    mr.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+    mr.onstop = async () => {
+      await transcribeChunk(new Blob(chunks, { type: "audio/webm" }));
+      if (recordingRef.current) recordChunk(); // next chunk
+    };
+    mrRef.current = mr;
+    mr.start();
+    setTimeout(() => { if (mr.state !== "inactive") mr.stop(); }, CHUNK_MS);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const startRec = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream, { mimeType: "audio/webm" });
-      mrRef.current = mr; chunksRef.current = [];
-      mr.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-      mr.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
-        setIsTranscribing(true);
-        try {
-          const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-          const fd = new FormData(); fd.append("audio", blob, "rec.webm");
-          const res = await fetch(`${API_URL}/api/voice/transcribe`, { method: "POST", body: fd });
-          const data = await res.json();
-          if (!res.ok) throw new Error(data.error);
-          setTranscript(p => p ? p + " " + data.text : data.text);
-        } catch (e) { setError(`Transcription: ${e instanceof Error ? e.message : "failed"}`); }
-        finally { setIsTranscribing(false); }
-      };
-      mr.start(250); setIsRecording(true);
+      streamRef.current = stream;
+      recordingRef.current = true;
+      setIsRecording(true);
+      recordChunk();
     } catch { setError("Mic access denied — type below"); }
+  }, [recordChunk]);
+
+  const stopRec = useCallback(() => {
+    recordingRef.current = false;
+    setIsRecording(false);
+    if (mrRef.current && mrRef.current.state !== "inactive") mrRef.current.stop();
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    // Finalize shortly after, once the last chunk has been transcribed + appended.
+    setTimeout(() => { if (transcriptRef.current.trim()) pushLive(transcriptRef.current, true); }, 1200);
   }, []);
 
-  const stopRec = useCallback(() => { mrRef.current?.stop(); setIsRecording(false); }, []);
+  // Debounced live push while typing (recording drives its own pushes per chunk).
+  useEffect(() => {
+    if (isRecording) return;
+    if (!transcript.trim()) return;
+    const t = setTimeout(() => { pushLive(transcript, false); }, 1200);
+    return () => clearTimeout(t);
+  }, [transcript, isRecording]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Submit = finalize the active encounter: runs orders, safety, nurse assessment + care plan.
   const handleSubmit = async () => {
     if (!transcript.trim()) return;
-    setIsProcessing(true); setError(null); setResult(null);
+    setIsProcessing(true); setError(null);
     try {
-      const res = await fetch(`${API_URL}/api/agents/draft`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer paramedic_sarah" },
-        body: JSON.stringify({ transcript }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      const e = data.encounter;
-      setResult({
-        encounterId: e.id, status: e.status, acuity: e.acuity,
-        chiefComplaint: e.structuredData?.chiefComplaint,
-        diagnosis: e.diagnosis?.primary, confidence: e.diagnosis?.confidence,
-        reasoning: e.diagnosis?.reasoning,
-        safetyFlags: e.safetyFlags ?? [],
-        orders: e.draftOrders ?? [],
-        auditEntries: e.auditTrail?.length ?? 0,
-      });
-    } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
-    finally { setIsProcessing(false); }
+      await pushLive(transcript, true);
+    } finally { setIsProcessing(false); }
   };
 
   const words = transcript.split(/\s+/).filter(Boolean).length;
@@ -196,7 +274,7 @@ export default function ParamedicApp() {
   return (
     <div className="h-screen flex flex-col bg-gray-100 overflow-hidden" style={{fontFamily:"'Segoe UI',system-ui,sans-serif",fontSize:"13px"}}>
       <TopNav subtitle="Sarah Mitchell · Unit 42" />
-      <ActionBar actions={["🎙 START DICTATION","⏹ STOP RECORDING","📤 SUBMIT TO PIPELINE","🗑 CLEAR TRANSCRIPT","🖨 PRINT REPORT"]} />
+      <ActionBar actions={["Start Dictation","Stop Recording","Submit to Pipeline","Clear Transcript","Print Report"]} />
 
       {/* Patient card strip — driven by live dispatch */}
       {(() => {
@@ -294,7 +372,7 @@ export default function ParamedicApp() {
                     </p>
                     <p className="text-xs pl-4 mt-0.5">
                       <span className={`capitalize ${inFlight ? "text-blue-600 font-medium" : "text-gray-400"}`}>{stage}</span>
-                      {(e.safetyFlags?.length ?? 0) > 0 && <span className="text-red-600 font-bold ml-1">⚠{e.safetyFlags!.length}</span>}
+                      {(e.safetyFlags?.length ?? 0) > 0 && <span className="text-red-600 font-bold ml-1">!{e.safetyFlags!.length}</span>}
                     </p>
                   </button>
                 );
@@ -314,7 +392,6 @@ export default function ParamedicApp() {
                   disabled={isProcessing || isTranscribing}
                   className={`flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-semibold text-white transition-all disabled:opacity-50 ${isRecording ? "bg-red-500 animate-pulse" : "bg-[#2563a8] hover:bg-[#1e3f7a]"}`}
                 >
-                  <span>{isRecording ? "⏹" : "🎙"}</span>
                   {isRecording ? "Stop Recording" : "Start Dictation"}
                 </button>
                 {isRecording && <span className="flex h-2 w-2"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75"/><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"/></span>}
@@ -341,7 +418,7 @@ export default function ParamedicApp() {
                   disabled={!transcript.trim() || isProcessing || isTranscribing}
                   className="flex-1 py-1.5 bg-[#2563a8] hover:bg-[#1e3f7a] text-white text-xs font-semibold rounded disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
                 >
-                  {isProcessing ? <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Running 9-Agent Pipeline…</> : "📤 Submit to Agent Pipeline"}
+                  {isProcessing ? <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Running 9-Agent Pipeline…</> : "Submit to Agent Pipeline"}
                 </button>
               </div>
               {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">{error}</p>}
@@ -379,7 +456,7 @@ export default function ParamedicApp() {
                 </div>
                 {result.safetyFlags.length > 0 && (
                   <div className="pb-2 border-b border-gray-100">
-                    <p className="text-red-600 font-bold text-xs uppercase mb-1">⚠ Safety Flags</p>
+                    <p className="text-red-600 font-bold text-xs uppercase mb-1">Safety Flags</p>
                     {result.safetyFlags.map((f,i)=>(
                       <div key={i} className="bg-red-50 border border-red-100 rounded p-1.5 mb-1 text-xs">
                         <p className="font-bold text-red-700">{f.severity.toUpperCase()}: {f.drug}</p>
@@ -398,11 +475,11 @@ export default function ParamedicApp() {
           <Panel title="Handoff" className="flex-shrink-0">
             <div className="px-3 py-2 space-y-2">
               <a href={NURSE_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 bg-teal-600 text-white rounded text-xs font-semibold hover:bg-teal-700 transition-colors">
-                <span>🏥</span><span>Nurse Station</span>
+                <span>Nurse Station</span>
                 <span className="ml-auto">›</span>
               </a>
               <a href={DOCTOR_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 bg-[#2563a8] text-white rounded text-xs font-semibold hover:bg-[#1e3f7a] transition-colors">
-                <span>👨‍⚕️</span><span>Doctor CRM</span>
+                <span>Doctor CRM</span>
                 <span className="ml-auto">›</span>
               </a>
             </div>

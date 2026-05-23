@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getAllEncounters, subscribe } from "@/lib/store";
+import { getAllEncounters, subscribe, getActiveSelection } from "@/lib/store";
 import { corsHeaders, corsResponse } from "@/lib/cors";
 
 // SSE works best on Node runtime with a long execution budget. On Vercel hobby
@@ -33,17 +33,19 @@ export async function GET(req: NextRequest) {
       // Tell clients to reconnect after 2s if the stream drops
       controller.enqueue(encoder.encode(`retry: 2000\n\n`));
 
-      // Initial snapshot so a freshly-connected client paints immediately
+      // Initial snapshot so a freshly-connected client paints immediately.
+      // selectedId lets a late-joining tab focus the patient already in play.
       try {
         const initial = await getAllEncounters();
-        send("snapshot", { encounters: initial });
+        send("snapshot", { encounters: initial, selectedId: getActiveSelection() });
       } catch (err) {
         send("error", { message: err instanceof Error ? err.message : "snapshot failed" });
       }
 
       // Live updates
       const unsubscribe = subscribe((event) => {
-        send(event.type, event.type === "upsert" ? event.encounter : { id: event.id });
+        if (event.type === "upsert") send("upsert", event.encounter);
+        else send(event.type, { id: event.id });
       });
 
       // Heartbeat keeps proxies & load balancers from killing idle connections.

@@ -37,6 +37,12 @@ export default function DoctorCRM() {
   const selectedIdRef = useRef<string | null>(null);
   useEffect(() => { selectedIdRef.current = selected?.id ?? null; }, [selected]);
 
+  // Mirror current list + a pending shared-selection id so a `select` broadcast
+  // that arrives before its `upsert` still focuses the patient once it lands.
+  const encountersRef = useRef<Encounter[]>([]);
+  useEffect(() => { encountersRef.current = encounters; }, [encounters]);
+  const pendingSelectRef = useRef<string | null>(null);
+
   const refresh = useCallback(async () => {
     try {
       const list = await getEncounters();
@@ -51,10 +57,11 @@ export default function DoctorCRM() {
   useEffect(() => {
     refresh();
     const dispose = subscribeToEncounters({
-      onSnapshot: (list) => {
+      onSnapshot: (list, selectedId) => {
         setEncounters(list);
-        if (selectedIdRef.current) {
-          const u = list.find(e=>e.id===selectedIdRef.current);
+        const focus = selectedId ?? selectedIdRef.current;
+        if (focus) {
+          const u = list.find(e=>e.id===focus);
           if (u) setSelected(u);
         }
       },
@@ -65,10 +72,18 @@ export default function DoctorCRM() {
           const next = [...prev]; next[idx] = enc; return next;
         });
         if (selectedIdRef.current === enc.id) setSelected(enc);
+        if (pendingSelectRef.current === enc.id) { setSelected(enc); pendingSelectRef.current = null; }
       },
       onDelete: (id) => {
         setEncounters(prev => prev.filter(e=>e.id!==id));
         if (selectedIdRef.current === id) setSelected(null);
+      },
+      // 911 (or any station) focused a patient — jump every tab to it at once.
+      onSelect: (id) => {
+        pendingSelectRef.current = id;
+        if (!id) return;
+        const found = encountersRef.current.find(e=>e.id===id);
+        if (found) { setSelected(found); pendingSelectRef.current = null; }
       },
     });
     const poll = setInterval(refresh, 30000);
@@ -112,7 +127,7 @@ export default function DoctorCRM() {
           <span className="font-semibold">{selected?.patientContext?.name ?? "Select Patient"}</span>
         </div>
         <div className="ml-auto flex items-center gap-3 text-sm opacity-70">
-          <span>🔍</span><span>🕐</span><span>+</span><span>⚙</span><span>?</span>
+          <span>Search</span><span>History</span><span>New</span><span>Settings</span><span>Help</span>
           <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-xs font-bold">JC</div>
         </div>
       </nav>
@@ -121,9 +136,9 @@ export default function DoctorCRM() {
       <div className="bg-[#2563a8] text-white flex items-center h-9 px-3 gap-1 flex-shrink-0">
         <button onClick={handleApprove} disabled={!selected||approving||isApproved}
           className="text-xs font-semibold px-4 h-7 rounded border border-white/40 bg-white/10 hover:bg-white/20 disabled:opacity-50 transition-colors">
-          {approving?"⏳ APPROVING...":"✅ APPROVE ORDERS"}
+          {approving?"APPROVING...":"APPROVE ORDERS"}
         </button>
-        {["📋 VIEW AUDIT","🖨 PRINT ORDERS","📤 REQUEST CONSULT","🗑 REJECT ENCOUNTER","🔄 REFRESH"].map(a=>(
+        {["View Audit","Print Orders","Request Consult","Reject Encounter","Refresh"].map(a=>(
           <button key={a} className="text-xs font-medium px-3 h-7 rounded border border-white/20 hover:bg-white/10 transition-colors">{a}</button>
         ))}
         <div className="ml-auto flex gap-4 text-xs">
@@ -181,7 +196,7 @@ export default function DoctorCRM() {
                       <div className="min-w-0">
                         <p className="font-semibold text-gray-900 text-xs truncate">{e.patientContext?.name ?? "Unknown"}</p>
                         <p className="text-gray-500 text-xs truncate">{e.structuredData?.chiefComplaint ?? "Processing..."}</p>
-                        {(e.safetyFlags?.length??0)>0 && <p className="text-red-600 text-xs font-bold">⚠ {e.safetyFlags!.length} flags</p>}
+                        {(e.safetyFlags?.length??0)>0 && <p className="text-red-600 text-xs font-bold">{e.safetyFlags!.length} flags</p>}
                       </div>
                     </div>
                   </button>
@@ -287,8 +302,8 @@ export default function DoctorCRM() {
                       {/* Alerts */}
                       {(na.override_flag || na.isolation_required) && (
                         <div className="flex gap-2">
-                          {na.override_flag && <div className="flex-1 bg-red-50 border border-red-200 rounded p-1.5 text-red-700 font-bold text-center">⚠ OVERRIDE FLAG</div>}
-                          {na.isolation_required && <div className="flex-1 bg-yellow-50 border border-yellow-200 rounded p-1.5 text-yellow-700 font-bold text-center">🔒 ISOLATION</div>}
+                          {na.override_flag && <div className="flex-1 bg-red-50 border border-red-200 rounded p-1.5 text-red-700 font-bold text-center">OVERRIDE FLAG</div>}
+                          {na.isolation_required && <div className="flex-1 bg-yellow-50 border border-yellow-200 rounded p-1.5 text-yellow-700 font-bold text-center">ISOLATION</div>}
                         </div>
                       )}
 
@@ -382,7 +397,7 @@ export default function DoctorCRM() {
             </>
           ) : (
             <div className="flex-1 bg-white border border-gray-200 rounded flex items-center justify-center">
-              <div className="text-center"><div className="text-4xl mb-3">👨‍⚕️</div><p className="text-gray-400 font-medium">Select a patient to review</p><p className="text-gray-300 text-xs mt-1">Choose from the patient queue on the left</p></div>
+              <div className="text-center"><p className="text-gray-400 font-medium">Select a patient to review</p><p className="text-gray-300 text-xs mt-1">Choose from the patient queue on the left</p></div>
             </div>
           )}
         </div>
@@ -421,7 +436,7 @@ export default function DoctorCRM() {
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-gray-400 italic text-center py-3">{selected ? "✅ No safety flags" : "Select a patient"}</p>
+              <p className="text-xs text-gray-400 italic text-center py-3">{selected ? "No safety flags" : "Select a patient"}</p>
             )}
           </Panel>
 
@@ -430,14 +445,14 @@ export default function DoctorCRM() {
               {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1 mb-2">{error}</p>}
               {isApproved ? (
                 <div className="bg-green-50 border border-green-200 rounded p-3 text-center text-xs">
-                  <p className="font-bold text-green-700">✅ Committed to EHR</p>
+                  <p className="font-bold text-green-700">Committed to EHR</p>
                   <p className="text-green-600 mt-0.5">by {selected?.physicianName}</p>
                   <p className="text-gray-400 mt-0.5">{selected?.approvedAt ? new Date(selected.approvedAt).toLocaleString() : ""}</p>
                 </div>
               ) : selected ? (
                 <button onClick={handleApprove} disabled={approving}
                   className="w-full py-2.5 bg-[#2563a8] hover:bg-[#1e3f7a] text-white text-sm font-bold rounded transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                  {approving ? <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Processing...</> : "✅ Approve & Commit to EHR"}
+                  {approving ? <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Processing...</> : "Approve & Commit to EHR"}
                 </button>
               ) : <p className="text-xs text-gray-400 italic text-center">No feedback records found</p>}
             </div>

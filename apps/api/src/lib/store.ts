@@ -1,4 +1,4 @@
-import { Encounter, AuditEntry, NursingNote } from "@/types";
+import { Encounter, AuditEntry, NursingNote, NursingCarePlan } from "@/types";
 import { createServerSupabase } from "@/lib/supabase";
 
 // In-memory fallback (per-lambda) — used only when Supabase is not configured.
@@ -6,29 +6,55 @@ import { createServerSupabase } from "@/lib/supabase";
 // multi-step handoff (paramedic → nurse → doctor) requires the Supabase path
 // for reliable cross-instance updates. With pure in-memory, real-time only
 // works for clients that happen to share the same warm lambda.
-const memory = new Map<string, Encounter>();
-
 // In-process pub/sub for SSE broadcasts. One subscriber per connected client.
 type Listener = (event: StoreEvent) => void;
 export type StoreEvent =
   | { type: "upsert"; encounter: Encounter }
-  | { type: "delete"; id: string };
+  | { type: "delete"; id: string }
+  | { type: "select"; id: string | null };
 
-const listeners = new Set<Listener>();
+// Pin the in-memory store, pub/sub listeners, and active selection to globalThis.
+// Next.js dev re-evaluates modules per route bundle, which would otherwise fork
+// these singletons — the SSE listeners registered by /stream would live in a
+// different instance than the publish() called by /seed, and real-time updates
+// would silently stop flowing between routes. globalThis keeps one shared copy.
+type HealthflowStore = {
+  memory: Map<string, Encounter>;
+  listeners: Set<Listener>;
+  activeSelectionId: string | null;
+};
+const globalRef = globalThis as unknown as { __healthflowStore?: HealthflowStore };
+const store: HealthflowStore =
+  globalRef.__healthflowStore ??
+  (globalRef.__healthflowStore = { memory: new Map(), listeners: new Set(), activeSelectionId: null });
+
+const memory = store.memory;
 
 export function subscribe(listener: Listener): () => void {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+  store.listeners.add(listener);
+  return () => store.listeners.delete(listener);
 }
 
 function publish(event: StoreEvent) {
-  for (const listener of listeners) {
+  for (const listener of store.listeners) {
     try {
       listener(event);
     } catch (err) {
       console.error("[store] listener error:", err);
     }
   }
+}
+
+// The patient currently "in focus" across every connected CRM. When a 911
+// dispatcher (or any station) selects a patient, this is broadcast so all open
+// tabs jump to the same encounter at once.
+export function getActiveSelection(): string | null {
+  return store.activeSelectionId;
+}
+
+export function setActiveSelection(id: string | null) {
+  store.activeSelectionId = id;
+  publish({ type: "select", id });
 }
 
 const TABLE = "encounters";
@@ -49,6 +75,7 @@ type EncounterRow = {
   safety_flags: Encounter["safetyFlags"] | null;
   safety_recommendation: string | null;
   nurse_assessment: Encounter["nurseAssessment"] | null;
+  nursing_care_plan: NursingCarePlan | null;
   nursing_notes: NursingNote[] | null;
   triage_status: Encounter["triageStatus"] | null;
   nurse_id: string | null;
@@ -76,6 +103,7 @@ function rowToEncounter(r: EncounterRow): Encounter {
     safetyFlags: r.safety_flags ?? undefined,
     safetyRecommendation: r.safety_recommendation ?? undefined,
     nurseAssessment: r.nurse_assessment ?? undefined,
+    nursingCarePlan: r.nursing_care_plan ?? undefined,
     nursingNotes: r.nursing_notes ?? undefined,
     triageStatus: r.triage_status ?? undefined,
     nurseId: r.nurse_id ?? undefined,
@@ -104,6 +132,7 @@ function encounterToRow(e: Encounter): EncounterRow {
     safety_flags: e.safetyFlags ?? null,
     safety_recommendation: e.safetyRecommendation ?? null,
     nurse_assessment: e.nurseAssessment ?? null,
+    nursing_care_plan: e.nursingCarePlan ?? null,
     nursing_notes: e.nursingNotes ?? null,
     triage_status: e.triageStatus ?? null,
     nurse_id: e.nurseId ?? null,

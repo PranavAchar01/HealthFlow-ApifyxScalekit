@@ -9,6 +9,7 @@ export type AgentRole =
   | "safety_controller"
   | "case_supervisor"
   | "nurse_assessment"
+  | "nurse_care_plan"
   | "identity_auth"
   | "ehr_write"
   | "audit";
@@ -110,6 +111,21 @@ export interface NurseAssessment {
   handoff_to_doctor: string;
 }
 
+export interface NursingCarePlanStep {
+  order: number;
+  action: string;
+  rationale: string;
+  priority: "immediate" | "urgent" | "routine";
+  category: "airway" | "breathing" | "circulation" | "medication" | "monitoring" | "comfort" | "safety" | "communication";
+}
+
+export interface NursingCarePlan {
+  summary: string;
+  steps: NursingCarePlanStep[];
+  generatedAt: string;
+  engine: "ai" | "rule-based";
+}
+
 export interface DraftOrder {
   id: string;
   type: "medication" | "procedure" | "imaging" | "lab" | "consult";
@@ -158,6 +174,9 @@ export interface Encounter {
 
   // Nurse AI assessment
   nurseAssessment?: NurseAssessment;
+
+  // Nurse AI care plan — ordered nursing interventions ("steps to treat")
+  nursingCarePlan?: NursingCarePlan;
 
   // Phase 5: Approval
   approvedBy?: string;

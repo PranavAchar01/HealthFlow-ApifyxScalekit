@@ -42,6 +42,12 @@ export default function NurseStation() {
   const selectedIdRef = useRef<string | null>(null);
   useEffect(() => { selectedIdRef.current = selected?.id ?? null; }, [selected]);
 
+  // Mirror current list + a pending shared-selection id so a `select` broadcast
+  // that arrives before its `upsert` still focuses the patient once it lands.
+  const encountersRef = useRef<Encounter[]>([]);
+  useEffect(() => { encountersRef.current = encounters; }, [encounters]);
+  const pendingSelectRef = useRef<string | null>(null);
+
   const refresh = useCallback(async () => {
     try {
       const list = await getEncounters();
@@ -56,10 +62,11 @@ export default function NurseStation() {
   useEffect(() => {
     refresh();
     const dispose = subscribeToEncounters({
-      onSnapshot: (list) => {
+      onSnapshot: (list, selectedId) => {
         setEncounters(list);
-        if (selectedIdRef.current) {
-          const u = list.find(e=>e.id===selectedIdRef.current);
+        const focus = selectedId ?? selectedIdRef.current;
+        if (focus) {
+          const u = list.find(e=>e.id===focus);
           if (u) setSelected(u);
         }
       },
@@ -70,10 +77,19 @@ export default function NurseStation() {
           const next = [...prev]; next[idx] = enc; return next;
         });
         if (selectedIdRef.current === enc.id) setSelected(enc);
+        // A shared-selection broadcast may have arrived before this encounter existed.
+        if (pendingSelectRef.current === enc.id) { setSelected(enc); pendingSelectRef.current = null; }
       },
       onDelete: (id) => {
         setEncounters(prev => prev.filter(e=>e.id!==id));
         if (selectedIdRef.current === id) setSelected(null);
+      },
+      // 911 (or any station) focused a patient — jump every tab to it at once.
+      onSelect: (id) => {
+        pendingSelectRef.current = id;
+        if (!id) return;
+        const found = encountersRef.current.find(e=>e.id===id);
+        if (found) { setSelected(found); pendingSelectRef.current = null; }
       },
     });
     const poll = setInterval(refresh, 30000);
@@ -113,17 +129,17 @@ export default function NurseStation() {
         <div className="flex items-center gap-1 text-sm">
           <span className="opacity-60">HealthFlow</span><span className="opacity-30 mx-1">&rsaquo;</span>
           <span className="opacity-60">Nursing</span><span className="opacity-30 mx-1">&rsaquo;</span>
-          <span className="font-semibold">Maria Rodriguez, RN &mdash; Bay 3</span>
+          <span className="font-semibold">Maria Rodriguez, RN - Bay 3</span>
         </div>
         <div className="ml-auto flex items-center gap-3 text-sm opacity-70">
-          <span>🔍</span><span>⚙</span>
+          <span>Search</span><span>Settings</span>
           <div className="w-7 h-7 rounded-full bg-teal-500 flex items-center justify-center text-xs font-bold">MR</div>
         </div>
       </nav>
 
       {/* Action bar */}
       <div className="bg-[#2563a8] text-white flex items-center h-9 px-3 gap-1 flex-shrink-0">
-        {["📋 ADD NOTE","🏥 SET TRIAGE","🚨 ESCALATE","🖨 PRINT","🔄 REFRESH"].map(a=>(
+        {["Add Note","Set Triage","Escalate","Print","Refresh"].map(a=>(
           <button key={a} className="text-xs font-medium px-3 h-7 rounded border border-white/20 hover:bg-white/10 transition-colors">{a}</button>
         ))}
         <div className="ml-auto flex gap-4 text-xs">
@@ -190,7 +206,7 @@ export default function NurseStation() {
                   <div className="flex items-center gap-1 mt-1">
                     <span className={`text-xs px-1.5 rounded font-medium text-white ${riskColor(e.acuity)}`}>{e.acuity}</span>
                     {e.nurseAssessment && <span className="text-xs text-teal-600 font-medium">{e.nurseAssessment.acuity_level}</span>}
-                    {(e.safetyFlags?.length??0)>0 && <span className="text-xs text-red-600 font-bold">⚠{e.safetyFlags!.length}</span>}
+                    {(e.safetyFlags?.length??0)>0 && <span className="text-xs text-red-600 font-bold">!{e.safetyFlags!.length}</span>}
                     <span className="text-xs text-gray-400 ml-auto">{new Date(e.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span>
                   </div>
                 </button>
@@ -227,13 +243,11 @@ export default function NurseStation() {
                       <div className="flex gap-2">
                         {na.override_flag && (
                           <div className="flex-1 bg-red-50 border border-red-200 rounded p-2 flex items-center gap-2">
-                            <span className="text-red-600 font-bold text-sm">⚠</span>
-                            <span className="text-red-700 font-bold">OVERRIDE FLAG — Manual physician review required</span>
+                            <span className="text-red-700 font-bold">OVERRIDE FLAG - Manual physician review required</span>
                           </div>
                         )}
                         {na.isolation_required && (
                           <div className="flex-1 bg-yellow-50 border border-yellow-200 rounded p-2 flex items-center gap-2">
-                            <span className="text-yellow-600 font-bold text-sm">🔒</span>
                             <span className="text-yellow-700 font-bold">ISOLATION REQUIRED</span>
                           </div>
                         )}
@@ -348,7 +362,7 @@ export default function NurseStation() {
                           <div><p className="text-gray-400 mb-1">Reasoning</p><p className="text-gray-700 leading-relaxed">{selected.diagnosis.reasoning}</p></div>
                           {(selected.safetyFlags?.length??0)>0 && (
                             <div className="border-t border-gray-100 pt-2">
-                              <p className="font-bold text-red-600 uppercase mb-1">⚠ Safety Flags</p>
+                              <p className="font-bold text-red-600 uppercase mb-1">Safety Flags</p>
                               {selected.safetyFlags!.map((f,i)=>(
                                 <div key={i} className="bg-red-50 border border-red-100 rounded p-2 mb-1">
                                   <p className="font-bold text-red-700">{f.severity.toUpperCase()}: {f.drug}</p>
@@ -391,10 +405,47 @@ export default function NurseStation() {
                   </Panel>
                 </div>
               )}
+
+              {/* AI Nurse Care Plan — the ordered nursing steps to treat this patient */}
+              {selected.nursingCarePlan ? (
+                <Panel
+                  title="Nursing Care Plan — Steps to Treat"
+                  badge={<span className="text-xs font-bold px-1.5 py-0.5 rounded bg-teal-100 text-teal-700 uppercase">{selected.nursingCarePlan.engine === "ai" ? "AI" : "Protocol"}</span>}
+                  className="flex-1"
+                >
+                  <div className="px-3 py-2 overflow-auto h-full space-y-2 text-xs">
+                    <p className="text-gray-600 italic">{selected.nursingCarePlan.summary}</p>
+                    {selected.nursingCarePlan.steps.map(s=>(
+                      <div key={s.order} className="flex gap-2 border border-gray-100 rounded p-2 bg-white">
+                        <div className="w-6 h-6 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold flex-shrink-0">{s.order}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                            <span className={`text-xs font-bold uppercase px-1.5 py-0.5 rounded ${
+                              s.priority==="immediate" ? "bg-red-100 text-red-700" :
+                              s.priority==="urgent" ? "bg-orange-100 text-orange-700" :
+                              "bg-gray-100 text-gray-600"
+                            }`}>{s.priority}</span>
+                            <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-blue-50 text-blue-600 capitalize">{s.category}</span>
+                          </div>
+                          <p className="font-semibold text-gray-900">{s.action}</p>
+                          <p className="text-gray-500 mt-0.5">{s.rationale}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Panel>
+              ) : na ? (
+                <Panel title="Nursing Care Plan — Steps to Treat" className="flex-shrink-0">
+                  <div className="px-3 py-4 text-center text-xs text-gray-400 flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4 text-teal-500" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                    AI nurse is drafting treatment steps…
+                  </div>
+                </Panel>
+              ) : null}
             </>
           ) : (
             <div className="flex-1 bg-white border border-gray-200 rounded flex items-center justify-center">
-              <div className="text-center"><div className="text-4xl mb-3">🏥</div><p className="text-gray-400 font-medium">Select a patient from the queue</p></div>
+              <div className="text-center"><p className="text-gray-400 font-medium">Select a patient from the queue</p></div>
             </div>
           )}
         </div>
@@ -441,7 +492,7 @@ export default function NurseStation() {
             <div className="px-3 py-2">
               <a href={DOCTOR_URL} target="_blank" rel="noopener noreferrer"
                 className="flex items-center gap-2 px-3 py-2 bg-[#2563a8] text-white rounded text-xs font-semibold hover:bg-[#1e3f7a] transition-colors">
-                <span>👨‍⚕️</span><span>Send to Doctor CRM</span><span className="ml-auto">&rsaquo;</span>
+                <span>Send to Doctor CRM</span><span className="ml-auto">&rsaquo;</span>
               </a>
             </div>
           </Panel>

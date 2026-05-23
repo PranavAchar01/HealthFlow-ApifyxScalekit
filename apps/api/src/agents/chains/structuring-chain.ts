@@ -76,16 +76,30 @@ export function fallbackStructuring(rawText: string): NonNullable<Encounter["str
     observations.push({ resourceType: "Observation", code: "9269-2", display: "GCS", value: vitals.gcs, unit: "", timestamp: now });
   }
 
-  if (text.includes("stroke") || text.includes("paralysis") || text.includes("facial droop") || text.includes("slurred speech")) {
+  const has = (...kws: string[]) => kws.some((k) => text.includes(k));
+  // Match "MI" only as a whole word — otherwise it hits "MInutes", "faMIly", etc.
+  const mentionsMI = /\bmi\b/.test(text) || has("stemi", "myocardial", "heart attack");
+
+  if (has("stroke", "paralysis", "facial droop", "face droop", "droopy", "slurred speech", "trouble speaking", "can't speak", "cant speak", "hemiparesis") ||
+      (has("left", "right", "arm", "leg", "face") && has("won't move", "wont move", "can't move", "cant move", "weakness", "numb"))) {
     chiefComplaint = "Suspected Stroke";
     conditions.push({ resourceType: "Condition", code: "I63.9", display: "Cerebral Infarction (Ischemic Stroke)", severity: "severe", onsetDateTime: now });
-  } else if (text.includes("chest pain") || text.includes("mi") || text.includes("heart attack")) {
+  } else if (has("chest pain") || mentionsMI) {
     chiefComplaint = "Chest Pain / Suspected MI";
     conditions.push({ resourceType: "Condition", code: "I21.9", display: "Acute Myocardial Infarction", severity: "severe", onsetDateTime: now });
-  } else if (text.includes("trauma") || text.includes("accident") || text.includes("injury")) {
+  } else if (has("overdose", "naloxone", "narcan", "opioid", "unresponsive", "syringe")) {
+    chiefComplaint = "Suspected Overdose";
+    conditions.push({ resourceType: "Condition", code: "T40.60", display: "Poisoning by Narcotics", severity: "severe", onsetDateTime: now });
+  } else if (has("seizure", "convulsion", "febrile", "shaking")) {
+    chiefComplaint = "Seizure";
+    conditions.push({ resourceType: "Condition", code: "R56.9", display: "Seizure", severity: "moderate", onsetDateTime: now });
+  } else if (has("hypoglycemia", "low sugar", "low blood sugar", "diabetic", "insulin")) {
+    chiefComplaint = "Diabetic Emergency";
+    conditions.push({ resourceType: "Condition", code: "E16.2", display: "Hypoglycemia", severity: "moderate", onsetDateTime: now });
+  } else if (has("trauma", "accident", "injury", "mva", "collision", "fell", "fall", "fracture")) {
     chiefComplaint = "Trauma";
     conditions.push({ resourceType: "Condition", code: "T07", display: "Multiple Injuries", severity: "moderate", onsetDateTime: now });
-  } else if (text.includes("breathing") || text.includes("dyspnea") || text.includes("shortness of breath")) {
+  } else if (has("breathing", "breathe", "dyspnea", "shortness of breath", "can't breathe", "cant breathe", "copd", "respiratory")) {
     chiefComplaint = "Respiratory Distress";
     conditions.push({ resourceType: "Condition", code: "R06.0", display: "Dyspnea", severity: "moderate", onsetDateTime: now });
   }
