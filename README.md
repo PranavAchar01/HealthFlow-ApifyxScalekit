@@ -1,5 +1,8 @@
 # HealthFlow
 
+> 🏆 **1st Place — Scalekit x Apify x Entire.io Hackathon (May 23, 2026)**
+> Built by **Pranav Achar, Sahiel Bose, and Nithin Aruswamy**
+
 **Multi-Agent Healthcare AI Pipeline -- Field to EHR in 60 seconds**
 
 A 9-agent pipeline that captures paramedic voice data, runs AI diagnostics, checks drug interactions, and commits physician-approved orders to the EHR with immutable audit at every step.
