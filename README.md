@@ -1,4 +1,4 @@
-# HealthFlow
+# HealthFlow 🏆 — 1st Place, Scalekit x Apify x Entire.io Hackathon
 
 > 🏆 **1st Place — Scalekit x Apify x Entire.io Hackathon (May 23, 2026)**
 > Built by **Pranav Achar, Sahiel Bose, and Nithin Aruswamy**
