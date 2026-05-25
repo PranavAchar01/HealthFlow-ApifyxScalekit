@@ -1,0 +1,31 @@
+{
+  "id": "stemi-clear",
+  "name": "STEMI — Clear Approval Path",
+  "description": "No contraindications; aspirin and cath lab activation should proceed",
+  "transcript": "55 year old female, severe crushing chest pain radiating to left arm, onset 45 minutes ago. Heart rate 78, blood pressure 145/88, SpO2 98%. Diaphoretic, pale. No prior cardiac history.",
+  "patientContext": {
+    "patientId": "PT-20240002",
+    "name": "Patricia Williams",
+    "age": 55,
+    "sex": "Female",
+    "allergies": [],
+    "currentMedications": [],
+    "conditions": [],
+    "recentLabs": {}
+  },
+  "expectedStructuring": {
+    "chiefComplaint": "Chest Pain / Suspected MI",
+    "vitals": { "heartRate": 78, "bloodPressure": "145/88", "spO2": 98 }
+  },
+  "expectedDiagnosis": {
+    "primaryContains": "MI",
+    "icdCode": "I21",
+    "minConfidence": 0.6
+  },
+  "expectedSafety": {
+    "mustBlockDrugs": [],
+    "mustOfferAlternatives": [],
+    "minContraindications": 0,
+    "maxContraindications": 0
+  }
+}

@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+        working-directory: apps/api
+
+      - name: Unit tests
+        run: npm test
+        working-directory: apps/api
+        env:
+          # No API key set → agents use rule-based fallbacks (deterministic, no external calls)
+          ANTHROPIC_API_KEY: ''
+
+      - name: Build all apps
+        run: npm run build

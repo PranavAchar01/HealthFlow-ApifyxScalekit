@@ -1,0 +1,71 @@
+flowchart TD
+    subgraph DISPATCH["911 Dispatch — :3005"]
+        D1[Dispatch operator logs\ncall & patient info]
+    end
+
+    subgraph FIELD["Paramedic Field — :3002"]
+        P1[Voice dictation\nWeb Speech API]
+        P2[Submit to API]
+    end
+
+    subgraph API["API Service — :3001  ·  POST /api/agents/draft"]
+        A1["Agent 1\nVoice Capture\n(auth + binding)"]
+        A2["Agent 2\nStructuring\n(LangChain → FHIR R4)"]
+        A25["Agent 2.5\nContext Pull\n(patient history + meds)"]
+        A7a["Agent 7a\nDiagnosis\n(LangChain → ICD-10)"]
+        A7c["Agent 7c\nAction Planner\n(LangChain → draft orders)"]
+        A3["Agent 3\nDrug/Allergy Check\n(Apify contraindication DB)"]
+        A8["Agent 8\nSafety Controller\n(block dangerous orders)"]
+        A9["Agent 9\nCase Supervisor\n(acuity + CRM routing)"]
+    end
+
+    subgraph NURSE["Nurse Dashboard — :3004"]
+        N1[Triage queue\nNursing protocol]
+        N2[Real-time updates via SSE]
+    end
+
+    subgraph DOCTOR["Doctor CRM — :3003"]
+        DR1[Clinical review\nApproval / rejection]
+        DR2["POST /api/agents/commit"]
+    end
+
+    subgraph COMMIT["API Service — :3001  ·  POST /api/agents/commit"]
+        C4["Agent 4\nIdentity/Auth\n(Scalekit physician token)"]
+        C5["Agent 5\nEHR Write\n(atomic order commit)"]
+        C6["Agent 6\nAudit\n(SHA-256 checksum chain)"]
+    end
+
+    subgraph STORE["Persistence"]
+        S1[(In-memory store\ndev / demo)]
+        S2[(Supabase\nproduction)]
+    end
+
+    D1 -->|patient demographics\n& history| P2
+    P1 -->|transcript| P2
+    P2 -->|POST /api/agents/draft\nBearer paramedic_sarah| A1
+    A1 --> A2
+    A2 --> A25
+    A25 --> A7a
+    A7a --> A7c
+    A7c --> A3
+    A3 --> A8
+    A8 --> A9
+    A9 -->|encounter created| S1
+    S1 -.->|optional| S2
+    A9 -->|SSE push| N2
+    N2 --> N1
+    N1 -->|escalate| DR1
+    A9 -->|encounter card| DR1
+    DR1 -->|approve| DR2
+    DR2 -->|POST /api/agents/commit\nBearer dr_chen| C4
+    C4 --> C5
+    C5 --> C6
+    C6 -->|immutable audit trail| S1
+
+    style API fill:#1e3a5f,color:#fff
+    style COMMIT fill:#1e3a5f,color:#fff
+    style STORE fill:#2d4a2d,color:#fff
+    style DISPATCH fill:#4a2d2d,color:#fff
+    style FIELD fill:#3a3a1e,color:#fff
+    style NURSE fill:#2d3a4a,color:#fff
+    style DOCTOR fill:#2d3a4a,color:#fff

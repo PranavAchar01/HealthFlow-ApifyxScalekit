@@ -1,0 +1,30 @@
+{
+  "id": "stroke-warfarin",
+  "name": "Ischemic Stroke + Warfarin Contraindication",
+  "description": "The signature demo: tPA must be blocked, thrombectomy offered",
+  "transcript": "68 year old male, suspected stroke, left-side paralysis, onset 20 minutes ago. Heart rate 92, blood pressure 168/94, SpO2 96%, GCS 13. Patient is alert but confused with facial droop and slurred speech. Patient is on Warfarin for atrial fibrillation.",
+  "patientContext": {
+    "patientId": "PT-20240001",
+    "name": "John Martinez",
+    "age": 68,
+    "sex": "Male",
+    "allergies": ["Penicillin"],
+    "currentMedications": ["Warfarin 5mg daily", "Lisinopril 10mg daily", "Metformin 500mg BID"],
+    "conditions": ["Atrial Fibrillation", "Hypertension", "Type 2 Diabetes"],
+    "recentLabs": { "INR": "2.8", "glucose": "142 mg/dL" }
+  },
+  "expectedStructuring": {
+    "chiefComplaint": "Suspected Stroke",
+    "vitals": { "heartRate": 92, "bloodPressure": "168/94", "spO2": 96, "gcs": 13 }
+  },
+  "expectedDiagnosis": {
+    "primaryContains": "Stroke",
+    "icdCode": "I63.9",
+    "minConfidence": 0.7
+  },
+  "expectedSafety": {
+    "mustBlockDrugs": ["tPA", "Alteplase"],
+    "mustOfferAlternatives": ["thrombectomy"],
+    "minContraindications": 1
+  }
+}

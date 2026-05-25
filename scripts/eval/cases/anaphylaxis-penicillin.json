@@ -1,0 +1,28 @@
+{
+  "id": "anaphylaxis-penicillin",
+  "name": "Anaphylaxis — Penicillin Allergy Safety Catch",
+  "description": "Ordering amoxicillin for a penicillin-allergic patient must be flagged",
+  "transcript": "32 year old female, severe allergic reaction, throat swelling and hives after eating at restaurant. Heart rate 118, blood pressure 88/60, SpO2 94%. Patient has known penicillin allergy.",
+  "patientContext": {
+    "patientId": "PT-20240003",
+    "name": "Maria Santos",
+    "age": 32,
+    "sex": "Female",
+    "allergies": ["Penicillin"],
+    "currentMedications": [],
+    "conditions": [],
+    "recentLabs": {}
+  },
+  "expectedStructuring": {
+    "vitals": { "heartRate": 118, "bloodPressure": "88/60", "spO2": 94 }
+  },
+  "expectedDiagnosis": {
+    "minConfidence": 0.3
+  },
+  "expectedSafety": {
+    "penicillinAllergyDocumented": true,
+    "mustBlockDrugs": [],
+    "mustOfferAlternatives": [],
+    "minContraindications": 0
+  }
+}
