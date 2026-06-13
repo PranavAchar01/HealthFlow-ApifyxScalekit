@@ -292,4 +292,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, how to add a new agent c
 
 ## License
 
-[MIT](LICENSE) — © 2026 Pranav Achar
+[MIT](LICENSE) — © 2026 Pranav Achar, Sahiel Bose, Shanay Gaitonde
