@@ -1,4 +1,4 @@
-# HealthFlow 🏆 — 1st Place, Scalekit x Apify x Entire.io Hackathon
+# HealthFlow 🏆 — 1st Place, Scalekit x Apify Hackathon
 
 **Multi-Agent Healthcare AI Pipeline — Field to EHR in 60 Seconds**
 
