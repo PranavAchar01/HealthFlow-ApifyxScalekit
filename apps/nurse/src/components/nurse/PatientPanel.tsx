@@ -2,7 +2,7 @@
 import { useState } from "react";
 import type { Encounter } from "@/types";
 import { AcuityPill, StatusPill, TriagePill } from "@/components/ui/badges";
-import { addNursingNote, setTriageStatus, updateVitals } from "@/lib/api";
+import { addNursingNote, setTriageStatus, updateVitals, interpretVitals, type VitalsInterpretation } from "@/lib/api";
 
 const CATEGORIES = ["assessment", "vitals_update", "medication", "escalation", "general"] as const;
 const TRIAGE_OPTIONS = ["pending", "in_assessment", "ready_for_doctor", "escalated"] as const;
@@ -18,22 +18,25 @@ export function PatientPanel({ encounter, onUpdate }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [isTriaging, setIsTriaging] = useState(false);
   const [isSavingVitals, setIsSavingVitals] = useState(false);
+  const [isInterpreting, setIsInterpreting] = useState(false);
+  const [vitalsAnalysis, setVitalsAnalysis] = useState<VitalsInterpretation | null>(null);
   const doctorUrl = process.env.NEXT_PUBLIC_DOCTOR_CRM_URL;
 
   const [vitalsForm, setVitalsForm] = useState(() => {
     const v = encounter.structuredData?.vitals ?? {};
     return {
-    heartRate:      String(v.heartRate      ?? ""),
-    bloodPressure:  String(v.bloodPressure  ?? ""),
-    spO2:           String(v.spO2           ?? ""),
-    temperature:    String(v.temperature    ?? ""),
-    respiratoryRate:String(v.respiratoryRate?? ""),
-      gcs:            String(v.gcs            ?? ""),
+      heartRate:       String(v.heartRate       ?? ""),
+      bloodPressure:   String(v.bloodPressure   ?? ""),
+      spO2:            String(v.spO2            ?? ""),
+      temperature:     String(v.temperature     ?? ""),
+      respiratoryRate: String(v.respiratoryRate ?? ""),
+      gcs:             String(v.gcs             ?? ""),
     };
   });
 
   const handleSaveVitals = async () => {
     setIsSavingVitals(true);
+    setVitalsAnalysis(null);
     try {
       const payload: Record<string, string | number> = {};
       Object.entries(vitalsForm).forEach(([k, val]) => {
@@ -41,6 +44,13 @@ export function PatientPanel({ encounter, onUpdate }: Props) {
       });
       const updated = await updateVitals(encounter.id, payload);
       onUpdate(updated);
+      // Run AI interpretation after saving
+      setIsInterpreting(true);
+      try {
+        const analysis = await interpretVitals(encounter.id);
+        setVitalsAnalysis(analysis);
+      } catch { /* non-critical */ }
+      finally { setIsInterpreting(false); }
     } finally {
       setIsSavingVitals(false);
     }
@@ -132,12 +142,12 @@ export function PatientPanel({ encounter, onUpdate }: Props) {
           <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Vitals</h3>
           <div className="grid grid-cols-3 gap-2">
             {([
-              { label: "HR",   key: "heartRate"       as const, unit: "bpm"  },
-              { label: "BP",   key: "bloodPressure"   as const, unit: "mmHg" },
-              { label: "SpO₂", key: "spO2"            as const, unit: "%"    },
-              { label: "Temp", key: "temperature"     as const, unit: "°F"   },
-              { label: "RR",   key: "respiratoryRate" as const, unit: "/min" },
-              { label: "GCS",  key: "gcs"             as const, unit: "/15"  },
+              { label: "Heart Rate",    key: "heartRate"       as const, unit: "bpm"  },
+              { label: "Blood Pressure",key: "bloodPressure"   as const, unit: "mmHg" },
+              { label: "SpO₂",          key: "spO2"            as const, unit: "%"    },
+              { label: "Temp",          key: "temperature"     as const, unit: "°F"   },
+              { label: "Resp Rate",     key: "respiratoryRate" as const, unit: "/min" },
+              { label: "GCS",           key: "gcs"             as const, unit: "/15"  },
             ] as { label: string; key: keyof typeof vitalsForm; unit: string }[]).map(({ label, key, unit }) => (
               <div key={label} className="bg-white rounded-lg border p-2.5">
                 <p className="text-xs text-gray-500 mb-1">{label} <span className="text-gray-300">{unit}</span></p>
@@ -152,11 +162,49 @@ export function PatientPanel({ encounter, onUpdate }: Props) {
           </div>
           <button
             onClick={handleSaveVitals}
-            disabled={isSavingVitals}
+            disabled={isSavingVitals || isInterpreting}
             className="mt-2 w-full py-1.5 bg-teal-600 text-white text-xs font-semibold rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-colors"
           >
-            {isSavingVitals ? "Saving…" : "Update Vitals"}
+            {isSavingVitals ? "Saving…" : isInterpreting ? "Analysing…" : "Update Vitals"}
           </button>
+
+          {/* AI Vitals Analysis */}
+          {vitalsAnalysis && (
+            <div className={`mt-3 rounded-lg border p-3 text-xs space-y-2 ${
+              vitalsAnalysis.critical
+                ? "bg-red-50 border-red-300"
+                : vitalsAnalysis.warnings.length > 0
+                ? "bg-amber-50 border-amber-300"
+                : "bg-emerald-50 border-emerald-300"
+            }`}>
+              <div className="flex items-center gap-2">
+                {vitalsAnalysis.critical && (
+                  <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded animate-pulse">
+                    CRITICAL — IMMEDIATE ACTION REQUIRED
+                  </span>
+                )}
+                <p className={`font-semibold ${vitalsAnalysis.critical ? "text-red-800" : vitalsAnalysis.warnings.length > 0 ? "text-amber-800" : "text-emerald-800"}`}>
+                  {vitalsAnalysis.summary}
+                </p>
+              </div>
+              {vitalsAnalysis.warnings.length > 0 && (
+                <div>
+                  <p className="font-bold text-red-700 uppercase mb-1">⚠ Warnings</p>
+                  {vitalsAnalysis.warnings.map((w, i) => (
+                    <p key={i} className="text-red-700">• {w}</p>
+                  ))}
+                </div>
+              )}
+              {vitalsAnalysis.recommendations.length > 0 && (
+                <div>
+                  <p className="font-bold text-gray-600 uppercase mb-1">Recommendations</p>
+                  {vitalsAnalysis.recommendations.map((r, i) => (
+                    <p key={i} className="text-gray-700">• {r}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Safety flags */}
@@ -180,26 +228,6 @@ export function PatientPanel({ encounter, onUpdate }: Props) {
           </section>
         )}
 
-        {/* AI Diagnosis */}
-        {encounter.diagnosis && (
-          <section>
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">AI Diagnosis</h3>
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-              <p className="font-semibold text-blue-900 text-sm">{encounter.diagnosis.primary}</p>
-              <p className="text-xs text-blue-600 mt-0.5">ICD-10: {encounter.diagnosis.icdCode}</p>
-              <div className="flex items-center gap-2 mt-2">
-                <div className="flex-1 bg-blue-200 rounded-full h-1.5">
-                  <div className="h-1.5 bg-blue-600 rounded-full" style={{ width: `${encounter.diagnosis.confidence * 100}%` }} />
-                </div>
-                <span className="text-xs text-blue-700 font-medium">
-                  {(encounter.diagnosis.confidence * 100).toFixed(0)}%
-                </span>
-              </div>
-              <p className="text-xs text-blue-700 mt-2">{encounter.diagnosis.reasoning}</p>
-            </div>
-          </section>
-        )}
-
         {/* Patient history */}
         {encounter.patientContext && (
           <section>
@@ -216,33 +244,6 @@ export function PatientPanel({ encounter, onUpdate }: Props) {
               <p><span className="text-gray-500">Conditions:</span>{" "}
                 <span className="font-medium">{encounter.patientContext.conditions.join(", ")}</span>
               </p>
-            </div>
-          </section>
-        )}
-
-        {/* Existing nursing notes */}
-        {(encounter.nursingNotes?.length ?? 0) > 0 && (
-          <section>
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
-              Nursing Notes ({encounter.nursingNotes!.length})
-            </h3>
-            <div className="space-y-2">
-              {encounter.nursingNotes!.map((n) => (
-                <div key={n.id} className="bg-teal-50 border border-teal-100 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-semibold text-teal-700">{n.nurseName}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs bg-teal-100 text-teal-600 px-1.5 py-0.5 rounded capitalize">
-                        {n.category.replace(/_/g, " ")}
-                      </span>
-                      <span className="text-xs text-gray-400">
-                        {new Date(n.timestamp).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-800">{n.note}</p>
-                </div>
-              ))}
             </div>
           </section>
         )}

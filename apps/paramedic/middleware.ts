@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const REQUIRED_ROLE = 'paramedic'
-const LOGIN = 'http://localhost:3001/login'
+const LOGIN = 'http://localhost:3001'
 
 export async function middleware(req: NextRequest) {
   const raw = req.cookies.get('scalekit_session')?.value

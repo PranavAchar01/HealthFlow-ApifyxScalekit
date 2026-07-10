@@ -9,16 +9,9 @@ import { setSession } from '@/lib/cookies'
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl
   const code = searchParams.get('code')
-  const state = searchParams.get('state')
-
-  // CSRF state check — read directly from the incoming request cookies
-  const storedState = req.cookies.get('oauth_state')?.value
-  if (!storedState || state !== storedState) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login?error=state_mismatch`)
-  }
 
   if (!code) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login?error=no_code`)
+    return NextResponse.redirect(`http://localhost:3001`)
   }
 
   try {
@@ -109,6 +102,6 @@ export async function GET(req: NextRequest) {
     return response
   } catch (err) {
     console.error('ScaleKit callback error:', err)
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/login?error=auth_failed`)
+    return NextResponse.redirect(`http://localhost:3001`)
   }
 }

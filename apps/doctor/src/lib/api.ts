@@ -29,6 +29,10 @@ export async function commitEncounter(encounterId: string): Promise<{ encounter:
   });
 }
 
+export async function clearAllEncounters(): Promise<void> {
+  await apiFetch("/api/encounters", { method: "DELETE" });
+}
+
 export async function getDemoUsers(): Promise<unknown[]> {
   const data = await apiFetch<{ users: unknown[] }>("/api/auth/users");
   return data.users;

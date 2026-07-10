@@ -192,6 +192,19 @@ export async function upsertEncounter(encounter: Encounter): Promise<Encounter> 
   return encounter;
 }
 
+export async function clearAllEncounters(): Promise<void> {
+  const sb = createServerSupabase();
+  if (sb) {
+    // Delete all rows — neq on a guaranteed-non-empty value selects every row.
+    const { error } = await sb.from(TABLE).delete().neq("id", "");
+    if (error) console.error("[store] clearAllEncounters error:", error.message);
+  }
+  const ids = Array.from(memory.keys());
+  memory.clear();
+  store.activeSelectionId = null;
+  for (const id of ids) publish({ type: "delete", id });
+}
+
 export async function deleteEncounter(id: string): Promise<boolean> {
   const sb = createServerSupabase();
   if (sb) {

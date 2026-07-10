@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Encounter } from "@/types";
-import { getEncounters, commitEncounter, subscribeToEncounters } from "@/lib/api";
+import { getEncounters, commitEncounter, clearAllEncounters, subscribeToEncounters } from "@/lib/api";
 import { useSession } from "@/lib/useSession";
 
 function Panel({ title, badge, children, className="" }: { title:string; badge?:React.ReactNode; children:React.ReactNode; className?:string }) {
@@ -29,18 +29,34 @@ function ESIBadge({ level }: { level: string }) {
   return <span className={`text-xs font-bold px-2 py-0.5 rounded ${colors[level] ?? "bg-gray-200 text-gray-700"}`}>{level}</span>;
 }
 
+function buildSBAR(enc: Encounter): string {
+  const ctx = enc.patientContext;
+  const name = ctx?.name ?? "Unknown";
+  const age = ctx?.age ?? "?";
+  const sex = ctx?.sex ?? "Unknown";
+  const complaint = enc.structuredData?.chiefComplaint ?? "Unknown chief complaint";
+  const conditions = ctx?.conditions?.join(", ") || "None";
+  const meds = ctx?.currentMedications?.join(", ") || "None";
+  const dx = enc.diagnosis?.primary ?? "Pending";
+  const conf = enc.diagnosis ? `${(enc.diagnosis.confidence * 100).toFixed(0)}%` : "N/A";
+  const flagCount = enc.safetyFlags?.length ?? 0;
+  const orderCount = enc.draftOrders?.length ?? 0;
+  const specialist = enc.nurseAssessment?.specialist_consult_needed;
+  const specialistPart = specialist ? ` ${specialist} consulted.` : "";
+  return `SBAR Handoff — ${name}, ${age}yo ${sex}. Situation: ${complaint}, arrival via ambulance. Background: ${conditions}. Meds: ${meds}. Assessment: AI Dx ${dx} (${conf} confidence). ${flagCount} safety flag(s) — review contraindications. Recommendation: ${orderCount} draft orders pending approval.${specialistPart}`;
+}
+
 export default function DoctorCRM() {
   const { session } = useSession();
   const [encounters, setEncounters] = useState<Encounter[]>([]);
   const [selected, setSelected] = useState<Encounter|null>(null);
   const [approving, setApproving] = useState(false);
   const [error, setError] = useState<string|null>(null);
+  const [allEncountersOpen, setAllEncountersOpen] = useState(false);
 
   const selectedIdRef = useRef<string | null>(null);
   useEffect(() => { selectedIdRef.current = selected?.id ?? null; }, [selected]);
 
-  // Mirror current list + a pending shared-selection id so a `select` broadcast
-  // that arrives before its `upsert` still focuses the patient once it lands.
   const encountersRef = useRef<Encounter[]>([]);
   useEffect(() => { encountersRef.current = encounters; }, [encounters]);
   const pendingSelectRef = useRef<string | null>(null);
@@ -54,6 +70,12 @@ export default function DoctorCRM() {
         if (u) setSelected(u);
       }
     } catch {}
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setEncounters([]);
+    setSelected(null);
+    await clearAllEncounters();
   }, []);
 
   useEffect(() => {
@@ -80,7 +102,6 @@ export default function DoctorCRM() {
         setEncounters(prev => prev.filter(e=>e.id!==id));
         if (selectedIdRef.current === id) setSelected(null);
       },
-      // 911 (or any station) focused a patient — jump every tab to it at once.
       onSelect: (id) => {
         pendingSelectRef.current = id;
         if (!id) return;
@@ -88,9 +109,7 @@ export default function DoctorCRM() {
         if (found) { setSelected(found); pendingSelectRef.current = null; }
       },
     });
-    // 3s polling keeps the doctor view fresh from Supabase HealthFlow_transcript.
-    const poll = setInterval(refresh, 3000);
-    return () => { dispose(); clearInterval(poll); };
+    return () => { dispose(); };
   }, [refresh]);
 
   const handleApprove = async () => {
@@ -106,13 +125,6 @@ export default function DoctorCRM() {
   const riskColor = (acuity: string) =>
     acuity==="critical"?"bg-red-500":acuity==="high"?"bg-orange-500":acuity==="medium"?"bg-yellow-500":"bg-green-500";
 
-  const ORDER_TYPE_CLR: Record<string,string> = {
-    medication:"bg-purple-100 text-purple-700",
-    imaging:"bg-blue-100 text-blue-700",
-    lab:"bg-cyan-100 text-cyan-700",
-    procedure:"bg-amber-100 text-amber-700",
-    consult:"bg-gray-100 text-gray-700",
-  };
   const v = selected?.structuredData?.vitals ?? {};
   const na = selected?.nurseAssessment;
   const isApproved = selected?.status === "committed" || selected?.status === "approved";
@@ -155,9 +167,15 @@ export default function DoctorCRM() {
             REQUIRES PHYSICIAN AUTHORIZATION
           </span>
         )}
-        {["View Audit","Print Orders","Request Consult","Reject Encounter","Refresh"].map(a=>(
+        {["View Audit","Print Orders","Request Consult","Reject Encounter"].map(a=>(
           <button key={a} className="text-xs font-medium px-3 h-7 rounded border border-white/20 hover:bg-white/10 transition-colors">{a}</button>
         ))}
+        <button
+          onClick={handleRefresh}
+          className="text-xs font-medium px-3 h-7 rounded border border-white/20 hover:bg-white/10 transition-colors"
+        >
+          Refresh
+        </button>
         <div className="ml-auto flex gap-4 text-xs">
           {[["Total",encounters.length,"text-white"],["Pending",pending.length,"text-red-300"],["Committed",encounters.filter(e=>e.status==="committed").length,"text-green-300"]].map(([l,val,c])=>(
             <span key={String(l)} className="flex items-center gap-1"><strong className={String(c)}>{String(val)}</strong><span className="opacity-60">{String(l)}</span></span>
@@ -182,7 +200,6 @@ export default function DoctorCRM() {
                 <div><p className="text-gray-400">Room</p><p className="font-semibold text-blue-700">{na.room_assignment}</p></div>
                 <div><p className="text-gray-400">Bed</p><p className="font-semibold">{na.bed_assignment}</p></div>
                 <div><p className="text-gray-400">ESI</p><ESIBadge level={na.acuity_level} /></div>
-                <div><p className="text-gray-400">Specialist</p><p className="font-semibold text-orange-700">{na.specialist_consult_needed ?? "None"}</p></div>
               </>
             )}
             <div><p className="text-gray-400">Attending</p><p className="font-semibold">Dr. James Chen</p></div>
@@ -198,56 +215,66 @@ export default function DoctorCRM() {
 
       <div className="flex flex-1 overflow-hidden p-3 gap-3">
         {/* LEFT: Queue */}
-        <div className="w-52 flex-shrink-0">
+        <div className="w-52 flex-shrink-0 flex flex-col gap-0 overflow-hidden">
           <Panel title={`Patients (${encounters.length})`} className="h-full">
-            {pending.length > 0 && (
-              <div className="border-b border-gray-100">
-                <p className="text-xs font-bold text-red-600 px-3 py-1.5 bg-red-50">NEEDS APPROVAL ({pending.length})</p>
-                {pending.map(e=>(
-                  <button key={e.id} onClick={()=>setSelected(e)}
-                    className={`w-full text-left px-3 py-2 hover:bg-red-50 border-l-2 border-l-red-400 ${selected?.id===e.id?"bg-blue-50":""}`}>
-                    <div className="flex items-center gap-2">
-                      <div className={`w-7 h-7 rounded-full text-white flex items-center justify-center text-xs font-bold flex-shrink-0 ${riskColor(e.acuity)}`}>
-                        {e.patientContext?.name?.split(" ").map(n=>n[0]).join("") ?? "?"}
+            <div className="overflow-y-auto h-full">
+              {pending.length > 0 && (
+                <div className="border-b border-gray-100">
+                  <p className="text-xs font-bold text-red-600 px-3 py-1.5 bg-red-50">NEEDS APPROVAL ({pending.length})</p>
+                  {pending.map(e=>(
+                    <button key={e.id} onClick={()=>setSelected(e)}
+                      className={`w-full text-left px-3 py-2 hover:bg-red-50 border-l-2 border-l-red-400 ${selected?.id===e.id?"bg-blue-50":""}`}>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-7 h-7 rounded-full text-white flex items-center justify-center text-xs font-bold flex-shrink-0 ${riskColor(e.acuity)}`}>
+                          {e.patientContext?.name?.split(" ").map(n=>n[0]).join("") ?? "?"}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900 text-xs truncate">{e.patientContext?.name ?? "Unknown"}</p>
+                          <p className="text-gray-500 text-xs truncate">{e.structuredData?.chiefComplaint ?? "Processing..."}</p>
+                          {(e.safetyFlags?.length??0)>0 && <p className="text-red-600 text-xs font-bold">{e.safetyFlags!.length} flags</p>}
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-900 text-xs truncate">{e.patientContext?.name ?? "Unknown"}</p>
-                        <p className="text-gray-500 text-xs truncate">{e.structuredData?.chiefComplaint ?? "Processing..."}</p>
-                        {(e.safetyFlags?.length??0)>0 && <p className="text-red-600 text-xs font-bold">{e.safetyFlags!.length} flags</p>}
-                      </div>
-                    </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {rest.length > 0 && (
+                <div>
+                  <button
+                    onClick={() => setAllEncountersOpen(o => !o)}
+                    className="w-full flex items-center justify-between text-xs font-bold text-gray-400 px-3 py-1.5 border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                  >
+                    <span>ALL ENCOUNTERS ({rest.length})</span>
+                    <span>{allEncountersOpen ? "▾" : "▸"}</span>
                   </button>
-                ))}
-              </div>
-            )}
-            <div>
-              {rest.length > 0 && <p className="text-xs font-bold text-gray-400 px-3 py-1.5 border-b border-gray-100">ALL ENCOUNTERS</p>}
-              {rest.map(e=>(
-                <button key={e.id} onClick={()=>setSelected(e)}
-                  className={`w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors ${selected?.id===e.id?"bg-blue-50 border-l-2 border-l-[#2563a8]":"border-l-2 border-l-transparent"}`}>
-                  <div className="flex items-center gap-2">
-                    <div className={`w-7 h-7 rounded-full text-white flex items-center justify-center text-xs font-bold flex-shrink-0 ${riskColor(e.acuity)}`}>
-                      {e.patientContext?.name?.split(" ").map(n=>n[0]).join("") ?? "?"}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-900 text-xs truncate">{e.patientContext?.name ?? "Unknown"}</p>
-                      <p className="text-gray-500 text-xs truncate">{e.status.replace(/_/g," ")}</p>
-                    </div>
-                  </div>
-                </button>
-              ))}
+                  {allEncountersOpen && rest.map(e=>(
+                    <button key={e.id} onClick={()=>setSelected(e)}
+                      className={`w-full text-left px-3 py-2 hover:bg-blue-50 transition-colors ${selected?.id===e.id?"bg-blue-50 border-l-2 border-l-[#2563a8]":"border-l-2 border-l-transparent"}`}>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-7 h-7 rounded-full text-white flex items-center justify-center text-xs font-bold flex-shrink-0 ${riskColor(e.acuity)}`}>
+                          {e.patientContext?.name?.split(" ").map(n=>n[0]).join("") ?? "?"}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900 text-xs truncate">{e.patientContext?.name ?? "Unknown"}</p>
+                          <p className="text-gray-500 text-xs truncate">{e.status.replace(/_/g," ")}</p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
               {encounters.length === 0 && <p className="text-xs text-gray-400 italic text-center py-6">No encounters yet</p>}
             </div>
           </Panel>
         </div>
 
         {/* CENTER: Clinical summary */}
-        <div className="flex-1 min-w-0 flex flex-col gap-3">
+        <div className="flex-1 min-w-0 flex flex-col gap-3 overflow-hidden">
           {selected ? (
             <>
               {/* Recommended Diagnosis — Prominent Banner */}
               {selected.diagnosis && (
-                <div className={`rounded border-2 p-3 flex items-start gap-3 ${
+                <div className={`rounded border-2 p-3 flex items-start gap-3 flex-shrink-0 ${
                   selected.diagnosis.confidence >= 0.8 ? "bg-blue-50 border-blue-300" :
                   selected.diagnosis.confidence >= 0.6 ? "bg-amber-50 border-amber-300" : "bg-gray-50 border-gray-300"
                 }`}>
@@ -274,7 +301,7 @@ export default function DoctorCRM() {
               )}
 
               {/* Vitals */}
-              <Panel title="Vital Signs">
+              <Panel title="Vital Signs" className="flex-shrink-0">
                 <div className="px-3 py-2">
                   <div className="grid grid-cols-6 gap-2">
                     {([["Heart Rate",v.heartRate,"bpm"],["Blood Pressure",v.bloodPressure,"mmHg"],["SpO₂",v.spO2,"%"],["Temp",v.temperature,"°F"],["Resp Rate",v.respiratoryRate,"/min"],["GCS",v.gcs,"/15"]] as const).map(([l,val,u])=>(
@@ -289,104 +316,99 @@ export default function DoctorCRM() {
               </Panel>
 
               {/* Nurse Handoff + Clinical Details */}
-              <div className="flex gap-3 flex-1 min-h-0">
+              <div className="flex gap-3 flex-1 min-h-0 overflow-hidden">
                 {/* Nurse Handoff Panel */}
-                {na && (
-                  <Panel title="Nurse Handoff" badge={<ESIBadge level={na.acuity_level} />} className="flex-1">
-                    <div className="px-3 py-2 space-y-2.5 text-xs overflow-auto h-full">
-                      {/* SBAR Summary */}
-                      <div className="bg-blue-50 border border-blue-200 rounded p-2">
-                        <p className="text-blue-800 font-bold uppercase text-xs mb-1">SBAR Handoff</p>
-                        <p className="text-blue-900 leading-relaxed">{na.handoff_to_doctor}</p>
-                      </div>
-
-                      {/* Quick Stats */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="border rounded p-1.5 text-center">
-                          <p className="text-gray-400">Priority</p>
-                          <p className={`text-lg font-bold ${na.priority_rank <= 2 ? "text-red-600" : "text-orange-600"}`}>#{na.priority_rank}</p>
-                        </div>
-                        <div className="border rounded p-1.5 text-center">
-                          <p className="text-gray-400">Room</p>
-                          <p className="font-bold text-blue-700">{na.room_assignment}</p>
-                        </div>
-                        <div className="border rounded p-1.5 text-center">
-                          <p className="text-gray-400">Triage</p>
-                          <p className="font-bold text-gray-900">{na.triage_category}</p>
-                        </div>
-                      </div>
-
-                      {/* Alerts */}
-                      {(na.override_flag || na.isolation_required) && (
-                        <div className="flex gap-2">
-                          {na.override_flag && <div className="flex-1 bg-red-50 border border-red-200 rounded p-1.5 text-red-700 font-bold text-center">OVERRIDE FLAG</div>}
-                          {na.isolation_required && <div className="flex-1 bg-yellow-50 border border-yellow-200 rounded p-1.5 text-yellow-700 font-bold text-center">ISOLATION</div>}
-                        </div>
-                      )}
-
-                      {/* Nurse Observations */}
-                      <div>
-                        <p className="text-gray-400 uppercase font-medium mb-1">Nurse Observations</p>
-                        <p className="text-gray-700 bg-gray-50 border rounded p-1.5 leading-relaxed">{na.nurse_observations}</p>
-                      </div>
-
-                      {/* Consult + Tests */}
-                      {na.specialist_consult_needed && (
-                        <div className="bg-orange-50 border border-orange-200 rounded p-1.5">
-                          <p className="text-orange-700 font-bold">Consult: {na.specialist_consult_needed}</p>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-gray-400 uppercase font-medium mb-1">Follow-Up Tests</p>
-                        <div className="flex flex-wrap gap-1">
-                          {na.follow_up_tests.map((t,i) => (
-                            <span key={i} className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">{t}</span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Equipment */}
-                      <div>
-                        <p className="text-gray-400 uppercase font-medium mb-1">Equipment</p>
-                        <div className="flex flex-wrap gap-1">
-                          {na.equipment_requested.map((eq,i) => (
-                            <span key={i} className="text-xs bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.5 rounded">{eq}</span>
-                          ))}
-                        </div>
-                      </div>
+                <Panel title="Nurse Handoff" badge={na ? <ESIBadge level={na.acuity_level} /> : undefined} className="flex-1 overflow-hidden">
+                  <div className="px-3 py-2 space-y-2.5 text-xs overflow-y-auto h-full">
+                    {/* SBAR Summary */}
+                    <div className="bg-blue-50 border border-blue-200 rounded p-2">
+                      <p className="text-blue-800 font-bold uppercase text-xs mb-1">SBAR Handoff</p>
+                      <p className="text-blue-900 leading-relaxed">{buildSBAR(selected)}</p>
                     </div>
-                  </Panel>
-                )}
 
-                {/* Clinical Assessment */}
-                <Panel title="Clinical Assessment" className={na ? "flex-1" : "flex-[2]"}>
-                  <div className="px-3 py-2 space-y-3 text-xs overflow-auto h-full">
-                    {selected.diagnosis && (
+                    {na && (
                       <>
-                        <div className="pb-2 border-b border-gray-100">
-                          <p className="text-gray-400 mb-1">Differential Diagnoses</p>
-                          <table className="w-full"><tbody>
-                            {selected.diagnosis.differentials.map((d,i)=>(
-                              <tr key={i} className="border-b border-gray-50 last:border-0">
-                                <td className="py-1">{d.condition}</td>
-                                <td className="py-1 text-right text-gray-500">{(d.probability*100).toFixed(0)}%</td>
-                                <td className="py-1 pl-2 w-20"><div className="h-1 bg-gray-200 rounded-full"><div className="h-1 bg-blue-400 rounded-full" style={{width:`${d.probability*100}%`}}/></div></td>
-                              </tr>
+                        {/* Quick Stats */}
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="border rounded p-1.5 text-center">
+                            <p className="text-gray-400">Priority</p>
+                            <p className={`text-lg font-bold ${na.priority_rank <= 2 ? "text-red-600" : "text-orange-600"}`}>#{na.priority_rank}</p>
+                          </div>
+                          <div className="border rounded p-1.5 text-center">
+                            <p className="text-gray-400">Room</p>
+                            <p className="font-bold text-blue-700">{na.room_assignment}</p>
+                          </div>
+                          <div className="border rounded p-1.5 text-center">
+                            <p className="text-gray-400">Triage</p>
+                            <p className="font-bold text-gray-900">{na.triage_category}</p>
+                          </div>
+                        </div>
+
+                        {/* Alerts */}
+                        {(na.override_flag || na.isolation_required) && (
+                          <div className="flex gap-2">
+                            {na.override_flag && <div className="flex-1 bg-red-50 border border-red-200 rounded p-1.5 text-red-700 font-bold text-center">OVERRIDE FLAG</div>}
+                            {na.isolation_required && <div className="flex-1 bg-yellow-50 border border-yellow-200 rounded p-1.5 text-yellow-700 font-bold text-center">ISOLATION</div>}
+                          </div>
+                        )}
+
+                        {/* Nurse Observations */}
+                        <div>
+                          <p className="text-gray-400 uppercase font-medium mb-1">Nurse Observations</p>
+                          <p className="text-gray-700 bg-gray-50 border rounded p-1.5 leading-relaxed">{na.nurse_observations}</p>
+                        </div>
+
+                        {/* Follow-Up Tests */}
+                        <div>
+                          <p className="text-gray-400 uppercase font-medium mb-1">Follow-Up Tests</p>
+                          <div className="flex flex-wrap gap-1">
+                            {na.follow_up_tests.map((t,i) => (
+                              <span key={i} className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded">{t}</span>
                             ))}
-                          </tbody></table>
+                          </div>
+                        </div>
+
+                        {/* Equipment */}
+                        <div>
+                          <p className="text-gray-400 uppercase font-medium mb-1">Equipment</p>
+                          <div className="flex flex-wrap gap-1">
+                            {na.equipment_requested.map((eq,i) => (
+                              <span key={i} className="text-xs bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.5 rounded">{eq}</span>
+                            ))}
+                          </div>
                         </div>
                       </>
                     )}
+                  </div>
+                </Panel>
+
+                {/* Clinical Assessment */}
+                <Panel title="Clinical Assessment" className="flex-1 overflow-hidden">
+                  <div className="px-3 py-2 space-y-3 text-xs overflow-y-auto h-full">
+                    {selected.diagnosis && (
+                      <div className="pb-2 border-b border-gray-100">
+                        <p className="text-gray-400 mb-1">Differential Diagnoses</p>
+                        <table className="w-full"><tbody>
+                          {selected.diagnosis.differentials.map((d,i)=>(
+                            <tr key={i} className="border-b border-gray-50 last:border-0">
+                              <td className="py-1">{d.condition}</td>
+                              <td className="py-1 text-right text-gray-500">{(d.probability*100).toFixed(0)}%</td>
+                              <td className="py-1 pl-2 w-20"><div className="h-1 bg-gray-200 rounded-full"><div className="h-1 bg-blue-400 rounded-full" style={{width:`${d.probability*100}%`}}/></div></td>
+                            </tr>
+                          ))}
+                        </tbody></table>
+                      </div>
+                    )}
                     <div>
                       <p className="text-gray-400 mb-1">Field Transcript</p>
-                      <p className="text-gray-700 bg-gray-50 rounded p-2 font-mono text-xs leading-relaxed border border-gray-200">{selected.rawTranscript}</p>
+                      <p className="text-gray-700 bg-gray-50 rounded p-2 font-mono text-xs leading-relaxed border border-gray-200 whitespace-pre-wrap">{selected.rawTranscript}</p>
                     </div>
                   </div>
                 </Panel>
 
-                <div className="w-44 flex-shrink-0 flex flex-col gap-3">
-                  <Panel title="Contact Info" className="flex-1">
-                    <div className="px-3 py-2 space-y-2 text-xs">
+                <div className="w-44 flex-shrink-0 flex flex-col gap-3 overflow-hidden">
+                  <Panel title="Contact Info" className="flex-1 overflow-hidden">
+                    <div className="px-3 py-2 space-y-2 text-xs overflow-y-auto h-full">
                       {([["Full Name",selected.patientContext?.name],["Patient ID",selected.patientContext?.patientId],["Age",`${selected.patientContext?.age}yo ${selected.patientContext?.sex}`],["Allergies",selected.patientContext?.allergies.join(", ")||"None"]] as const).map(([l,val])=>(
                         <div key={String(l)}><p className="text-gray-400">{l}</p><p className={`font-medium ${String(l)==="Allergies"&&val!=="None"?"text-red-700":"text-gray-800"}`}>{String(val)??""}</p></div>
                       ))}
@@ -420,17 +442,12 @@ export default function DoctorCRM() {
         </div>
 
         {/* RIGHT: Orders + Approval */}
-        <div className="w-64 flex-shrink-0 flex flex-col gap-3">
-          <Panel title={`Draft Orders (${selected?.draftOrders?.length??0})`} className="flex-1">
+        <div className="w-64 flex-shrink-0 flex flex-col gap-3 overflow-hidden">
+          <Panel title={`Draft Orders (${selected?.draftOrders?.length??0})`} className="flex-1 overflow-hidden">
             {selected?.draftOrders ? (
-              <div className="px-3 py-2 space-y-2">
+              <div className="px-3 py-2 space-y-2 overflow-y-auto h-full">
                 {selected.draftOrders.map(o=>(
                   <div key={o.id} className={`border rounded p-2 text-xs ${o.status==="blocked"?"border-red-200 bg-red-50":o.status==="approved"?"border-green-200 bg-green-50":"border-gray-200 bg-white"}`}>
-                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${ORDER_TYPE_CLR[o.type]??ORDER_TYPE_CLR.consult}`}>{o.type}</span>
-                      <span className={`text-xs font-bold uppercase ${o.urgency==="stat"?"text-red-600":"text-gray-500"}`}>{o.urgency}</span>
-                      <span className={`ml-auto text-xs font-bold uppercase ${o.status==="blocked"?"text-red-700":o.status==="approved"?"text-green-700":"text-gray-500"}`}>{o.status}</span>
-                    </div>
                     <p className="font-medium text-gray-900">{o.description}</p>
                     {o.medication && <p className="text-gray-500 mt-0.5">{o.medication.dosage} &middot; {o.medication.route}</p>}
                     {o.safetyNotes && <p className="text-red-600 mt-0.5 text-xs">{o.safetyNotes}</p>}

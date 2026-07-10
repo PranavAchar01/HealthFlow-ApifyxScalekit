@@ -34,6 +34,21 @@ export async function addNursingNote(
   return data.encounter;
 }
 
+export type VitalsInterpretation = {
+  recommendations: string[];
+  warnings: string[];
+  critical: boolean;
+  summary: string;
+};
+
+export async function interpretVitals(encounterId: string): Promise<VitalsInterpretation> {
+  const data = await apiFetch<VitalsInterpretation>(`/api/encounters/${encounterId}/vitals-interpret`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  return data;
+}
+
 export async function updateVitals(
   encounterId: string,
   vitals: Record<string, string | number>
